@@ -1,95 +1,111 @@
-# rtsp-client-android
+# Rtsp client android
+![MinAPI](https://img.shields.io/badge/API-21%2B-blue)
+[![Release](https://jitpack.io/v/am3n/rtsp-client-android.svg)](https://jitpack.io/#am3n/rtsp-client-android)
+
 Lightweight RTSP client library for Android.
 
-[![Release](https://jitpack.io/v/alexeyvasilyev/rtsp-client-android.svg)](https://jitpack.io/#alexeyvasilyev/rtsp-client-android)
+![Screenshot](docs/images/Screenshot_20221026_182823.png?raw=true "Screenshot")
 
-![Screenshot](docs/images/rtsp-demo-app.png?raw=true "Screenshot")
+## Features
 
-## Features:
-- Android min API 24.
+- Android min API 21.
 - RTSP/RTSPS over TCP.
 - Video H.264 only.
 - Audio AAC LC only.
-- Basic/Digest authentification.
+- Basic/Digest authentication.
 - Supports majority of RTSP IP cameras.
 
-
-## Permissions:
+## Permissions
 
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
 ```
 
-## Compile
+## Installation
 
 To use this library in your project add this to your build.gradle:
+
 ```gradle
 allprojects {
-  repositories {
-    maven { url 'https://jitpack.io' }
-  }
+    repositories {
+        maven { url 'https://jitpack.io' }
+    }
 }
 dependencies {
-  implementation 'com.github.alexeyvasilyev:rtsp-client-android:2.0.6'
+    implementation 'com.github.am3n:rtsp-client-android:NEWEST-VERSION'
 }
 ```
 
-## How to use:
-Easiest way is just to use `RtspSurfaceView` class for showing video stream in UI.
+## Usage
+
+1) Easiest way is just to use `SurfaceView` class for showing video stream in UI.
+
 ```xml
-<com.alexvas.rtsp.widget.RtspSurfaceView
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:id="@+id/svVideo" />
+<SurfaceView
+    android:id="@+id/svVideo"
+    android:layout_width="match_parent" 
+    android:layout_height="match_parent" />
 ```
 
 Then in code use:
+
 ```kotlin
-val uri = Uri.parse("rtsps://10.0.1.3/test.sdp")
+val url = "rtsps://10.0.1.3/test.sdp"
 val username = "admin"
 val password = "secret"
-svVideo.init(uri, username, password)
-svVideo.start(requestVideo = true, requestAudio = true)
+val rtsp = Rtsp()
+rtsp.init(uri, username, password)
+rtsp.setSurfaceView(binding.svVideo)
+rtsp.start()
 // ...
-svVideo.stop()
+rtsp.stop()
 ```
 
-You can still use library without any decoding (just for obtaining raw frames), e.g. for writing video stream into MP4 via muxer.
+---
+
+2) You can still use library without any decoding (just for obtaining raw frames), e.g. for writing video stream into MP4 via muxer.
 
 ```kotlin
-val rtspClientListener = object: RtspClient.RtspClientListener {
-    override fun onRtspConnecting() {}
-    override fun onRtspConnected(sdpInfo: SdpInfo) {}
-    override fun onRtspVideoNalUnitReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
+val rtspStatusListener = object : RtspStatusListener {
+    override fun onConnecting() {}
+    override fun onConnected(sdpInfo: SdpInfo) {}
+    override fun onVideoNalUnitReceived(frame: Frame) {
         // Send raw H264/H265 NAL unit to decoder
     }
-    override fun onRtspAudioSampleReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
+    override fun onAudioSampleReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
         // Send raw audio to decoder
     }
-    override fun onRtspDisconnected() {}
-    override fun onRtspFailedUnauthorized() {
-        Log.e(TAG, "RTSP failed unauthorized");
+    override fun onDisconnected() {}
+    override fun onUnauthorized() {
+        Log.e(TAG, "RTSP failed unauthorized")
     }
-    override fun onRtspFailed(message: String?) {
+    override fun onFailed(message: String?) {
         Log.e(TAG, "RTSP failed with message '$message'")
     }
 }
-
-val uri = Uri.parse("rtsps://10.0.1.3/test.sdp")
-val username = "admin"
-val password = "secret"
-val stopped = new AtomicBoolean(false)
-val sslSocket = NetUtils.createSslSocketAndConnect(uri.getHost(), uri.getPort(), 10000)
-
-val rtspClient = RtspClient.Builder(sslSocket, uri.toString(), stopped, rtspClientListener)
-    .requestVideo(true)
-    .requestAudio(true)
-    .withDebug(false)
-    .withUserAgent("RTSP client")
-    .withCredentials(username, password)
-    .build()
-// Blocking call until stopped variable is true or connection failed
-rtspClient.execute()
-
-NetUtils.closeSocket(sslSocket)
+// ... build rtsp
+rtsp.setStatusListener(rtspStatusListener)
+// rtsp.setSurfaceView(..) don't set surface view
+rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
+// ...
+rtsp.stop()
 ```
+
+---
+
+Also you can just check camera is online or not.
+
+```kotlin
+launch {
+    val url = "rtsps://10.0.1.3/test.sdp"
+    val username = "admin"
+    val password = "secret"
+    val isOnline = Rtsp.isOnline(url, username, password)
+    Log.d(TAG, "Camera is online: $isOnline")
+}
+```
+
+## Credits
+
+* https://github.com/alexeyvasilyev/rtsp-client-android
+

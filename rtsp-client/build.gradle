@@ -1,0 +1,18 @@
+plugins {
+    id 'com.android.library'
+    id 'kotlin-android'
+}
+
+android {
+    namespace 'ir.am3n.rtsp.client'
+    compileSdkVersion 33
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 33
+    }
+}
+
+dependencies {
+    implementation "androidx.annotation:annotation:1.5.0"
+    implementation "com.google.android.exoplayer:exoplayer-core:2.18.1"
+}
