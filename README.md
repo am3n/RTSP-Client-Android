@@ -1,6 +1,6 @@
 # Rtsp client android
 ![MinAPI](https://img.shields.io/badge/API-21%2B-blue)
-[![Release](https://jitpack.io/v/am3n/rtsp-client-android.svg)](https://jitpack.io/#am3n/rtsp-client-android)
+[![Release](https://jitpack.io/v/am3n/RTSP-Client-Android.svg)](https://jitpack.io/#am3n/RTSP-Client-Android)
 
 Lightweight RTSP client library for Android.
 
