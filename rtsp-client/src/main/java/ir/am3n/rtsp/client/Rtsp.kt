@@ -33,12 +33,12 @@ class Rtsp {
                     setStatusListener(object : RtspStatusListener {
                         override fun onConnecting() {}
                         override fun onConnected(sdpInfo: SdpInfo) {}
-                        override fun onVideoNalUnitReceived(frame: Frame) {
+                        override fun onVideoNalUnitReceived(frame: Frame?) {
                             setStatusListener(null)
                             stop()
                             it.resume(true)
                         }
-                        override fun onAudioSampleReceived(frame: Frame) {}
+                        override fun onAudioSampleReceived(frame: Frame?) {}
                         override fun onDisconnected() {
                             setStatusListener(null)
                             it.resume(false)
@@ -57,6 +57,47 @@ class Rtsp {
                     start(requestVideo = true, requestAudio = false, autoPlayAudio = false)
                 }
             }
+        }
+
+    }
+
+    internal inner class RtspThread : Thread() {
+
+        private var rtspStopped: AtomicBoolean = AtomicBoolean(false)
+
+        init {
+            name = "RTSP IO thread"
+        }
+
+        fun stopAsync() {
+            Log.v(TAG, "stopAsync()")
+            rtspStopped.set(true)
+            interrupt()
+        }
+
+        override fun run() {
+            onRtspClientStarted()
+            val port = if (uri.port == -1) DEFAULT_RTSP_PORT else uri.port
+            try {
+                Log.d(TAG, "Connecting to ${uri.host.toString()}:$port...")
+
+                val socket: Socket = NetUtils.createSocketAndConnect(uri, port, timeout = 5_000)
+
+                // Blocking call until stopped variable is true or connection failed
+                val rtspClient = RtspClient.Builder(socket, uri.toString(), rtspStopped, proxyClientListener)
+                    .requestVideo(requestVideo)
+                    .requestAudio(requestAudio)
+                    .withUserAgent(userAgent)
+                    .withCredentials(username, password)
+                    .build()
+
+                rtspClient.execute()
+
+                NetUtils.closeSocket(socket)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            onRtspClientStopped()
         }
 
     }
@@ -132,6 +173,9 @@ class Rtsp {
                     statusListener?.onVideoNalUnitReceived(Frame(data, offset, length, timestamp))
                 }
             } else {
+                uiHandler.post {
+                    statusListener?.onVideoNalUnitReceived(null)
+                }
                 Log.e(TAG, "onRtspVideoNalUnitReceived() zero length")
             }
         }
@@ -143,6 +187,9 @@ class Rtsp {
                     statusListener?.onAudioSampleReceived(Frame(data, offset, length, timestamp))
                 }
             } else {
+                uiHandler.post {
+                    statusListener?.onAudioSampleReceived(null)
+                }
                 Log.e(TAG, "onRtspAudioSampleReceived() zero length")
             }
         }
@@ -189,49 +236,6 @@ class Rtsp {
 
     }
 
-
-    inner class RtspThread : Thread() {
-
-        private var rtspStopped: AtomicBoolean = AtomicBoolean(false)
-
-        init {
-            name = "RTSP IO thread"
-        }
-
-        fun stopAsync() {
-            Log.v(TAG, "stopAsync()")
-            rtspStopped.set(true)
-            interrupt()
-        }
-
-        override fun run() {
-            onRtspClientStarted()
-            val port = if (uri.port == -1) DEFAULT_RTSP_PORT else uri.port
-            try {
-                Log.d(TAG, "Connecting to ${uri.host.toString()}:$port...")
-
-                val socket: Socket = NetUtils.createSocketAndConnect(uri, port, timeout = 5_000)
-
-                // Blocking call until stopped variable is true or connection failed
-                val rtspClient = RtspClient.Builder(socket, uri.toString(), rtspStopped, proxyClientListener)
-                    .requestVideo(requestVideo)
-                    .requestAudio(requestAudio)
-                    .withUserAgent(userAgent)
-                    .withCredentials(username, password)
-                    .build()
-
-                rtspClient.execute()
-
-                NetUtils.closeSocket(socket)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            onRtspClientStopped()
-        }
-
-    }
-
-
     fun init(url: String, username: String? = null, password: String? = null, userAgent: String? = null) {
         Log.v(TAG, "init(uri='$url', username=$username, password=$password, userAgent='$userAgent')")
         this.uri = Uri.parse(url)
@@ -266,7 +270,7 @@ class Rtsp {
         this.statusListener = listener
     }
 
-    fun setSurfaceView(surfaceView: SurfaceView) {
+    fun setSurfaceView(surfaceView: SurfaceView?) {
         this.surfaceView = surfaceView
         if (isStarted()) {
             startDecoders()
