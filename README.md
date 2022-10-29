@@ -69,10 +69,10 @@ rtsp.stop()
 val rtspStatusListener = object : RtspStatusListener {
     override fun onConnecting() {}
     override fun onConnected(sdpInfo: SdpInfo) {}
-    override fun onVideoNalUnitReceived(frame: Frame) {
+    override fun onVideoNalUnitReceived(frame: Frame?) {
         // Send raw H264/H265 NAL unit to decoder
     }
-    override fun onAudioSampleReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
+    override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
     override fun onDisconnected() {}
@@ -85,7 +85,7 @@ val rtspStatusListener = object : RtspStatusListener {
 }
 // ... build rtsp
 rtsp.setStatusListener(rtspStatusListener)
-// rtsp.setSurfaceView(..) don't set surface view
+rtsp.setSurfaceView(null) // or don't set surface view
 rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
 // ...
 rtsp.stop()
