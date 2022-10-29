@@ -55,7 +55,7 @@ class LiveFragment : Fragment() {
             binding.pbLoading.visibility = View.GONE
         }
 
-        override fun onVideoNalUnitReceived(frame: Frame) {
+        override fun onVideoNalUnitReceived(frame: Frame?) {
             disconnectCount = 0
             frameCounter++
             val now = System.currentTimeMillis()
@@ -71,8 +71,8 @@ class LiveFragment : Fragment() {
             }
         }
 
-        override fun onAudioSampleReceived(frame: Frame) {
-            if (DEBUG) Log.v(TAG, "onAudioSampleReceived()")
+        override fun onAudioSampleReceived(frame: Frame?) {
+
         }
 
         override fun onDisconnected() {
