@@ -40,7 +40,15 @@ internal class VideoDecoder(
         srcRect.bottom = height
         dstRect.right = width
         dstRect.bottom = height
-        surfaceView?.holder?.setFixedSize(width, height)
+        if (width > height) {
+            val rate = (surfaceView?.measuredWidth ?: 0).toFloat() / width.toFloat()
+            val height = (height * rate).toInt()
+            surfaceView?.holder?.setFixedSize(width, height)
+        } else {
+            val rate = (surfaceView?.measuredHeight ?: 0).toFloat() / height.toFloat()
+            val width = (width * rate).toInt()
+            surfaceView?.holder?.setFixedSize(width, height)
+        }
     }
 
     fun stopAsync() {
