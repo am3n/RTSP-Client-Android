@@ -14,6 +14,7 @@ Lightweight RTSP client library for Android.
 - Audio AAC LC only.
 - Basic/Digest authentication.
 - Supports majority of RTSP IP cameras.
+- Auto Decode H.264 to Media Image & Bitmap
 
 ## Permissions
 
@@ -71,6 +72,9 @@ val rtspStatusListener = object : RtspStatusListener {
     override fun onConnected(sdpInfo: SdpInfo) {}
     override fun onVideoNalUnitReceived(frame: Frame?) {
         // Send raw H264/H265 NAL unit to decoder
+    }
+    override fun onVideoFrameReceived(image: Image?, bitmap: Bitmap?) {
+        // Send decoded media image & bitmap frames
     }
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder

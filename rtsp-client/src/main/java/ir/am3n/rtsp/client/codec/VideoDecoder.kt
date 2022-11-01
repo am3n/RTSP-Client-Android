@@ -40,6 +40,7 @@ internal class VideoDecoder(
         srcRect.bottom = height
         dstRect.right = width
         dstRect.bottom = height
+        surfaceView?.holder?.setFixedSize(width, height)
     }
 
     fun stopAsync() {
