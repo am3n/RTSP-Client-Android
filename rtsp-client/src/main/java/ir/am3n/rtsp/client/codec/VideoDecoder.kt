@@ -1,18 +1,23 @@
 package ir.am3n.rtsp.client.codec
 
+import android.graphics.Rect
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.util.Log
-import android.view.Surface
+import android.view.SurfaceView
+import com.google.android.renderscript.Toolkit
+import com.google.android.renderscript.YuvFormat
+import ir.am3n.rtsp.client.interfaces.RtspClientListener
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal class VideoDecoder(
-    private val surface: Surface?,
+    var surfaceView: SurfaceView?,
     private val mimeType: String,
     private val width: Int,
     private val height: Int,
-    private val queue: FrameQueue
+    private val queue: FrameQueue,
+    private val clientListener: RtspClientListener
 ) : Thread() {
 
     companion object {
@@ -20,10 +25,21 @@ internal class VideoDecoder(
         private const val DEBUG = false
     }
 
+    private val srcRect = Rect()
+    private val dstRect = Rect()
     private var exitFlag: AtomicBoolean = AtomicBoolean(false)
+
+    /*private var timestamp = System.currentTimeMillis()
+    private var sum = 0L
+    private var decodeSum = 0L
+    private var count = 0*/
 
     init {
         name = "RTSP video thread"
+        srcRect.right = width
+        srcRect.bottom = height
+        dstRect.right = width
+        dstRect.bottom = height
     }
 
     fun stopAsync() {
@@ -41,13 +57,9 @@ internal class VideoDecoder(
             val widthHeight = getDecoderSafeWidthHeight(decoder)
             val format = MediaFormat.createVideoFormat(mimeType, widthHeight.first, widthHeight.second)
 
-            //decoder.setOnFrameRenderedListener(onFrameRenderedListener, null)
-
             if (DEBUG) Log.d(TAG, "Configuring surface ${widthHeight.first}x${widthHeight.second} w/ '$mimeType'")
 
-            decoder.configure(format, surface, null, 0)
-
-            decoder.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
+            decoder.configure(format, null, null, 0)
 
             decoder.start()
             if (DEBUG) Log.d(TAG, "Started surface decoder")
@@ -83,6 +95,7 @@ internal class VideoDecoder(
                     }
                     else -> {
                         if (outIndex >= 0) {
+                            decodeYuv(decoder, bufferInfo, outIndex)
                             decoder.releaseOutputBuffer(outIndex, bufferInfo.size != 0 && !exitFlag.get())
                         }
                     }
@@ -117,6 +130,59 @@ internal class VideoDecoder(
         }
 
         if (DEBUG) Log.d(TAG, "$name stopped")
+    }
+
+    private fun decodeYuv(decoder: MediaCodec, info: MediaCodec.BufferInfo, index: Int) {
+        try {
+
+            //val t = System.currentTimeMillis()
+
+            val buffer = decoder.getOutputBuffer(index)
+            buffer!!.position(info.offset)
+            buffer.limit(info.offset + info.size)
+            val byteArray = ByteArray(buffer.remaining())
+            buffer.get(byteArray)
+
+            val bitmap = try {
+                Toolkit.yuvToRgbBitmap(byteArray, width, height, YuvFormat.YUV_420_888)
+            } catch (t: Throwable) {
+                t.printStackTrace()
+                null
+            }
+
+            clientListener.onRtspVideoFrameReceived(decoder.getOutputImage(index), bitmap)
+
+            if (bitmap != null) {
+                surfaceView?.post {
+                    surfaceView?.holder?.surface?.run {
+                        if (isValid) {
+                            lockCanvas(dstRect)?.run {
+                                drawBitmap(bitmap, srcRect, dstRect, null)
+                                unlockCanvasAndPost(this)
+                            }
+                        }
+                    }
+                }
+            }
+
+            /*val time = System.currentTimeMillis() - timestamp
+            val decodeTime = System.currentTimeMillis() - t
+            if (DEBUG) Log.d(TAG, "time: $time      decode time: $decodeTime")
+            timestamp = System.currentTimeMillis()
+
+            sum += time
+            decodeSum += decodeTime
+            count++
+            if (count % 500 == 0) {
+                if (DEBUG) Log.d(TAG, "avg: ${sum / count}      decode avg: ${(decodeSum / count).toInt()}")
+                sum = 0
+                decodeSum = 0
+                count = 0
+            }*/
+
+        } catch (t: Throwable) {
+            t.printStackTrace()
+        }
     }
 
     private fun getDecoderSafeWidthHeight(decoder: MediaCodec): Pair<Int, Int> {

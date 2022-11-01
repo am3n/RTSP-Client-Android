@@ -1,5 +1,7 @@
 package ir.am3n.rtsp.client
 
+import android.graphics.Bitmap
+import android.media.Image
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -24,6 +26,7 @@ class Rtsp {
     companion object {
 
         private const val TAG: String = "Rtsp"
+        private const val DEBUG = true
         private const val DEFAULT_RTSP_PORT = 554
 
         suspend fun isOnline(url: String, username: String? = null, password: String? = null, userAgent: String? = null): Boolean {
@@ -38,6 +41,7 @@ class Rtsp {
                             stop()
                             it.resume(true)
                         }
+                        override fun onVideoFrameReceived(image: Image?, bitmap: Bitmap?) {}
                         override fun onAudioSampleReceived(frame: Frame?) {}
                         override fun onDisconnected() {
                             setStatusListener(null)
@@ -70,7 +74,7 @@ class Rtsp {
         }
 
         fun stopAsync() {
-            Log.v(TAG, "stopAsync()")
+            if (DEBUG) Log.v(TAG, "stopAsync()")
             rtspStopped.set(true)
             interrupt()
         }
@@ -79,12 +83,12 @@ class Rtsp {
             onRtspClientStarted()
             val port = if (uri.port == -1) DEFAULT_RTSP_PORT else uri.port
             try {
-                Log.d(TAG, "Connecting to ${uri.host.toString()}:$port...")
+                if (DEBUG) Log.d(TAG, "Connecting to ${uri.host.toString()}:$port...")
 
                 val socket: Socket = NetUtils.createSocketAndConnect(uri, port, timeout = 5_000)
 
                 // Blocking call until stopped variable is true or connection failed
-                val rtspClient = RtspClient.Builder(socket, uri.toString(), rtspStopped, proxyClientListener)
+                val rtspClient = RtspClient.Builder(socket, uri.toString(), rtspStopped, clientListener)
                     .requestVideo(requestVideo)
                     .requestAudio(requestAudio)
                     .withUserAgent(userAgent)
@@ -116,8 +120,6 @@ class Rtsp {
     private var audioDecoder: AudioDecoder? = null
 
     private var surfaceView: SurfaceView? = null
-    private var surfaceWidth = 1920
-    private var surfaceHeight = 1080
     private var statusListener: RtspStatusListener? = null
     private val uiHandler = Handler(Looper.getMainLooper())
     private var videoMimeType: String = "video/avc"
@@ -126,10 +128,10 @@ class Rtsp {
     private var audioChannelCount: Int = 0
     private var audioCodecConfig: ByteArray? = null
 
-    private val proxyClientListener = object : RtspClientListener {
+    private val clientListener = object : RtspClientListener {
 
         override fun onRtspConnected(sdpInfo: SdpInfo) {
-            Log.v(TAG, "onRtspConnected()")
+            if (DEBUG) Log.v(TAG, "onRtspConnected()")
             if (sdpInfo.videoTrack != null) {
                 videoQueue.clear()
                 when (sdpInfo.videoTrack?.videoCodec) {
@@ -148,7 +150,7 @@ class Rtsp {
                     pps.copyInto(data, sps.size, 0, pps.size)
                     videoQueue.push(Frame(data, 0, data.size, 0))
                 } else {
-                    Log.d(TAG, "RTSP SPS and PPS NAL units missed in SDP")
+                    if (DEBUG) Log.d(TAG, "RTSP SPS and PPS NAL units missed in SDP")
                 }
             }
             if (sdpInfo.audioTrack != null) {
@@ -160,7 +162,7 @@ class Rtsp {
                 audioChannelCount = sdpInfo.audioTrack?.channels!!
                 audioCodecConfig = sdpInfo.audioTrack?.config
             }
-            startDecoders()
+            startDecoders(sdpInfo)
             uiHandler.post {
                 statusListener?.onConnected(sdpInfo)
             }
@@ -176,7 +178,13 @@ class Rtsp {
                 uiHandler.post {
                     statusListener?.onVideoNalUnitReceived(null)
                 }
-                Log.e(TAG, "onRtspVideoNalUnitReceived() zero length")
+                if (DEBUG) Log.e(TAG, "onRtspVideoNalUnitReceived() zero length")
+            }
+        }
+
+        override fun onRtspVideoFrameReceived(image: Image?, bitmap: Bitmap?) {
+            uiHandler.post {
+                statusListener?.onVideoFrameReceived(image, bitmap)
             }
         }
 
@@ -190,26 +198,26 @@ class Rtsp {
                 uiHandler.post {
                     statusListener?.onAudioSampleReceived(null)
                 }
-                Log.e(TAG, "onRtspAudioSampleReceived() zero length")
+                if (DEBUG) Log.e(TAG, "onRtspAudioSampleReceived() zero length")
             }
         }
 
         override fun onRtspDisconnected() {
-            Log.v(TAG, "onRtspDisconnected()")
+            if (DEBUG) Log.v(TAG, "onRtspDisconnected()")
             uiHandler.post {
                 statusListener?.onDisconnected()
             }
         }
 
         override fun onRtspFailedUnauthorized() {
-            Log.v(TAG, "onRtspFailedUnauthorized()")
+            if (DEBUG) Log.v(TAG, "onRtspFailedUnauthorized()")
             uiHandler.post {
                 statusListener?.onUnauthorized()
             }
         }
 
         override fun onRtspFailed(message: String?) {
-            Log.v(TAG, "onRtspFailed(message='$message')")
+            if (DEBUG) Log.v(TAG, "onRtspFailed(message='$message')")
             uiHandler.post {
                 statusListener?.onFailed(message)
             }
@@ -220,24 +228,21 @@ class Rtsp {
     private val surfaceCallback = object : SurfaceHolder.Callback {
 
         override fun surfaceCreated(holder: SurfaceHolder) {
-            Log.v(TAG, "surfaceCreated()")
+            if (DEBUG) Log.v(TAG, "surfaceCreated()")
         }
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-            Log.v(TAG, "surfaceChanged(format=$format, width=$width, height=$height)")
-            surfaceWidth = width
-            surfaceHeight = height
+            if (DEBUG) Log.v(TAG, "surfaceChanged(format=$format, width=$width, height=$height)")
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder) {
-            Log.v(TAG, "surfaceDestroyed()")
-            stopDecoders(video = true, audio = false)
+            if (DEBUG) Log.v(TAG, "surfaceDestroyed()")
         }
 
     }
 
     fun init(url: String, username: String? = null, password: String? = null, userAgent: String? = null) {
-        Log.v(TAG, "init(uri='$url', username=$username, password=$password, userAgent='$userAgent')")
+        if (DEBUG) Log.v(TAG, "init(uri='$url', username=$username, password=$password, userAgent='$userAgent')")
         this.uri = Uri.parse(url)
         this.username = username
         this.password = password
@@ -245,7 +250,7 @@ class Rtsp {
     }
 
     fun start(requestVideo: Boolean = true, requestAudio: Boolean = true, autoPlayAudio: Boolean = true) {
-        Log.v(TAG, "start()")
+        if (DEBUG) Log.v(TAG, "start()")
         if (isStarted()) return
         rtspThread?.stopAsync()
         this.requestVideo = requestVideo
@@ -256,7 +261,7 @@ class Rtsp {
     }
 
     fun stop() {
-        Log.v(TAG, "stop()")
+        if (DEBUG) Log.v(TAG, "stop()")
         rtspThread?.stopAsync()
         rtspThread = null
     }
@@ -266,41 +271,43 @@ class Rtsp {
     }
 
     fun setStatusListener(listener: RtspStatusListener?) {
-        Log.v(TAG, "setStatusListener()")
+        if (DEBUG) Log.v(TAG, "setStatusListener()")
         this.statusListener = listener
     }
 
     fun setSurfaceView(surfaceView: SurfaceView?) {
         this.surfaceView = surfaceView
-        if (isStarted()) {
-            startDecoders()
-        }
+        this.videoDecoder?.surfaceView = surfaceView
     }
 
     private fun onRtspClientStarted() {
-        Log.v(TAG, "onRtspClientStarted()")
+        if (DEBUG) Log.v(TAG, "onRtspClientStarted()")
         uiHandler.post { statusListener?.onConnecting() }
     }
 
     private fun onRtspClientStopped() {
-        Log.v(TAG, "onRtspClientStopped()")
+        if (DEBUG) Log.v(TAG, "onRtspClientStopped()")
         stopDecoders()
         rtspThread = null
         uiHandler.post { statusListener?.onDisconnected() }
     }
 
 
-    private fun startDecoders() {
-        Log.v(TAG, "startDecoders()")
-        if (surfaceView != null && videoMimeType.isNotEmpty()) {
-            Log.i(TAG, "Starting video decoder with mime type \"$videoMimeType\"")
-            surfaceView!!.holder.addCallback(surfaceCallback)
+    private fun startDecoders(sdpInfo: SdpInfo) {
+        if (DEBUG) Log.v(TAG, "startDecoders()")
+        if (requestVideo && videoMimeType.isNotEmpty()) {
+            if (DEBUG) Log.i(TAG, "Starting video decoder with mime type \"$videoMimeType\"")
+            surfaceView?.holder?.addCallback(surfaceCallback)
             videoDecoder?.stopAsync()
-            videoDecoder = VideoDecoder(surfaceView!!.holder.surface, videoMimeType, surfaceWidth, surfaceHeight, videoQueue)
+            videoDecoder = VideoDecoder(
+                surfaceView, videoMimeType,
+                sdpInfo.videoTrack!!.frameWidth, sdpInfo.videoTrack!!.frameHeight,
+                videoQueue, clientListener
+            )
             videoDecoder!!.start()
         }
-        if (autoPlayAudio && audioMimeType.isNotEmpty()) {
-            Log.i(TAG, "Starting audio decoder with mime type \"$audioMimeType\"")
+        if (requestAudio && autoPlayAudio && audioMimeType.isNotEmpty()) {
+            if (DEBUG) Log.i(TAG, "Starting audio decoder with mime type \"$audioMimeType\"")
             audioDecoder?.stopAsync()
             audioDecoder = AudioDecoder(audioMimeType, audioSampleRate, audioChannelCount, audioCodecConfig, audioQueue)
             audioDecoder!!.start()
@@ -308,7 +315,7 @@ class Rtsp {
     }
 
     private fun stopDecoders(video: Boolean = true, audio: Boolean = true) {
-        Log.v(TAG, "stopDecoders()")
+        if (DEBUG) Log.v(TAG, "stopDecoders()")
         if (video) {
             surfaceView?.holder?.removeCallback(surfaceCallback)
             videoDecoder?.stopAsync()

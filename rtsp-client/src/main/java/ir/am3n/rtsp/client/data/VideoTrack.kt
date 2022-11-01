@@ -6,4 +6,6 @@ class VideoTrack : Track() {
     var videoCodec = RtspClientUtils.VIDEO_CODEC_H264
     var sps: ByteArray? = null
     var pps: ByteArray? = null
+    var frameWidth: Int = 1920
+    var frameHeight: Int = 1080
 }

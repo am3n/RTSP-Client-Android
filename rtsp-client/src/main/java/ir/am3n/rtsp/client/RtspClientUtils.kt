@@ -337,6 +337,16 @@ internal object RtspClientUtils {
                                 // Audio
                                 updateAudioTrackFromDescribeParam(tracks[1] as AudioTrack, param)
                             }
+                        } else if (param.second.startsWith("framesize:")) {
+                            var values = TextUtils.split(param.second, " ")
+                            if (values.size > 1) {
+                                values = TextUtils.split(values[1], "-")
+                                if (values.size == 2) {
+                                    (tracks[0] as VideoTrack).frameWidth = values[0].toInt()
+                                    (tracks[0] as VideoTrack).frameHeight = values[1].toInt()
+                                }
+                            }
+
                         } else if (param.second.startsWith("rtpmap:")) {
                             if (currentTrack is VideoTrack) {
                                 // Video

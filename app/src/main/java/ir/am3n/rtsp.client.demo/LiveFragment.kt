@@ -1,6 +1,8 @@
 package ir.am3n.rtsp.client.demo
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.media.Image
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -71,6 +73,10 @@ class LiveFragment : Fragment() {
             }
         }
 
+        override fun onVideoFrameReceived(image: Image?, bitmap: Bitmap?) {
+
+        }
+
         override fun onAudioSampleReceived(frame: Frame?) {
 
         }
@@ -116,8 +122,6 @@ class LiveFragment : Fragment() {
         liveViewModel = ViewModelProvider(this)[LiveViewModel::class.java]
         binding = FragmentLiveBinding.inflate(inflater, container, false)
 
-        rtsp.setStatusListener(rtspStatusListener)
-
         binding.etRtspRequest.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {}
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -150,6 +154,9 @@ class LiveFragment : Fragment() {
             }
         }
 
+        rtsp.setStatusListener(rtspStatusListener)
+        rtsp.setSurfaceView(binding.svVideo)
+
         return binding.root
     }
 
@@ -157,10 +164,6 @@ class LiveFragment : Fragment() {
         super.onResume()
         if (DEBUG) Log.v(TAG, "onResume()")
         liveViewModel.loadParams(requireContext())
-        CoroutineScope(Dispatchers.Main).launch {
-            delay(500)
-            rtsp.setSurfaceView(binding.svVideo)
-        }
     }
 
     override fun onPause() {
