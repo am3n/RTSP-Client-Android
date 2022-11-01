@@ -1,2 +1,3 @@
 include ':app'
 include ':rtsp-client'
+include ':renderscript-toolkit'
