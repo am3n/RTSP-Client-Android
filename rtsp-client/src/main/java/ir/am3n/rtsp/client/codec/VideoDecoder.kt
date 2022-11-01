@@ -1,5 +1,6 @@
 package ir.am3n.rtsp.client.codec
 
+import android.graphics.Bitmap
 import android.graphics.Rect
 import android.media.MediaCodec
 import android.media.MediaFormat
@@ -159,7 +160,10 @@ internal class VideoDecoder(
                 null
             }
 
-            clientListener.onRtspVideoFrameReceived(decoder.getOutputImage(index), bitmap)
+            clientListener.onRtspVideoFrameReceived(
+                decoder.getOutputImage(index),
+                bitmap?.copy(Bitmap.Config.RGB_565, true)
+            )
 
             if (bitmap != null) {
                 surfaceView?.post {

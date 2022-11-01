@@ -1,7 +1,7 @@
 package ir.am3n.rtsp.client.demo
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
+import android.graphics.*
 import android.media.Image
 import android.os.Bundle
 import android.text.Editable
@@ -74,7 +74,9 @@ class LiveFragment : Fragment() {
         }
 
         override fun onVideoFrameReceived(image: Image?, bitmap: Bitmap?) {
-
+            binding.img.run {
+                post { setImageBitmap(bitmap?.removeTimestamp()) }
+            }
         }
 
         override fun onAudioSampleReceived(frame: Frame?) {
@@ -170,6 +172,13 @@ class LiveFragment : Fragment() {
         super.onPause()
         if (DEBUG) Log.v(TAG, "onPause()")
         liveViewModel.saveParams(requireContext())
+    }
+
+    private fun Bitmap.removeTimestamp(): Bitmap {
+        Canvas(this).apply {
+            drawRect(Rect(19, 12, 444, 40), Paint().apply { color = Color.LTGRAY })
+        }
+        return this
     }
 
 }
