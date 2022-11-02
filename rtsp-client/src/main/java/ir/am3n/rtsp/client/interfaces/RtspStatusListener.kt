@@ -9,7 +9,7 @@ interface RtspStatusListener {
     fun onConnecting()
     fun onConnected(sdpInfo: SdpInfo)
     fun onVideoNalUnitReceived(frame: Frame?)
-    fun onVideoFrameReceived(image: Image?, bitmap: Bitmap?)
+    fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?)
     fun onAudioSampleReceived(frame: Frame?)
     fun onDisconnected()
     fun onUnauthorized()

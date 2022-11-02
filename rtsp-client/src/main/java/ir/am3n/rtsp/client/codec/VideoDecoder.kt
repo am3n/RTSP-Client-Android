@@ -14,6 +14,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 internal class VideoDecoder(
     var surfaceView: SurfaceView?,
+    var requestMediaImage: Boolean,
+    var requestYuvBytes: Boolean,
+    var requestBitmap: Boolean,
     private val mimeType: String,
     private val width: Int,
     private val height: Int,
@@ -148,24 +151,26 @@ internal class VideoDecoder(
         try {
 
             //val t = System.currentTimeMillis()
+            if (surfaceView == null && !requestMediaImage && !requestYuvBytes && !requestBitmap)
+                return
 
             val buffer = decoder.getOutputBuffer(index)
             buffer!!.position(info.offset)
             buffer.limit(info.offset + info.size)
-            val byteArray = ByteArray(buffer.remaining())
-            buffer.get(byteArray)
+            val yuv420ByteArray = ByteArray(buffer.remaining())
+            buffer.get(yuv420ByteArray)
 
-            val bitmap = try {
-                Toolkit.yuvToRgbBitmap(byteArray, width, height, YuvFormat.YUV_420_888)
-            } catch (t: Throwable) {
-                t.printStackTrace()
+            val bitmap = if (surfaceView != null || requestBitmap) {
+                try {
+                    Toolkit.yuvToRgbBitmap(yuv420ByteArray, width, height, YuvFormat.YUV_420_888)
+                } catch (t: Throwable) {
+                    t.printStackTrace()
+                    null
+                }
+            } else {
                 null
             }
 
-            clientListener.onRtspVideoFrameReceived(
-                decoder.getOutputImage(index),
-                bitmap?.copy(Bitmap.Config.RGB_565, true)
-            )
 
             if (bitmap != null) {
                 surfaceView?.post {
@@ -178,6 +183,15 @@ internal class VideoDecoder(
                         }
                     }
                 }
+            }
+
+            if (requestMediaImage || requestYuvBytes || requestBitmap) {
+                clientListener.onRtspVideoFrameReceived(
+                    width, height,
+                    if (requestMediaImage) decoder.getOutputImage(index) else null,
+                    if (requestYuvBytes) yuv420ByteArray else null,
+                    if (requestBitmap) bitmap?.copy(Bitmap.Config.RGB_565, true) else null
+                )
             }
 
             /*val time = System.currentTimeMillis() - timestamp

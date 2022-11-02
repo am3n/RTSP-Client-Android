@@ -14,7 +14,7 @@ Lightweight RTSP client library for Android.
 - Audio AAC LC only.
 - Basic/Digest authentication.
 - Supports majority of RTSP IP cameras.
-- Auto Decode H.264 to Media Image & Bitmap
+- Auto Decode H.264 to Media Image & YUV ByteArray & Bitmap.
 
 ## Permissions
 
@@ -39,7 +39,7 @@ dependencies {
 
 ## Usage
 
-1) Easiest way is just to use `SurfaceView` class for showing video stream in UI.
+### 1) Easiest way is just to use `SurfaceView` class for showing video stream in UI.
 
 ```xml
 <SurfaceView
@@ -64,7 +64,8 @@ rtsp.stop()
 
 ---
 
-2) You can still use library without any decoding (just for obtaining raw frames), e.g. for writing video stream into MP4 via muxer.
+### 2) You can still use library without any decoding (just for obtaining raw H264/H265 frames) 
+e.g. for writing video stream into MP4 via muxer.
 
 ```kotlin
 val rtspStatusListener = object : RtspStatusListener {
@@ -73,19 +74,13 @@ val rtspStatusListener = object : RtspStatusListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {
         // Send raw H264/H265 NAL unit to decoder
     }
-    override fun onVideoFrameReceived(image: Image?, bitmap: Bitmap?) {
-        // Send decoded media image & bitmap frames
-    }
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {}
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
     override fun onDisconnected() {}
-    override fun onUnauthorized() {
-        Log.e(TAG, "RTSP failed unauthorized")
-    }
-    override fun onFailed(message: String?) {
-        Log.e(TAG, "RTSP failed with message '$message'")
-    }
+    override fun onUnauthorized() {}
+    override fun onFailed(message: String?) {}
 }
 // ... build rtsp
 rtsp.setStatusListener(rtspStatusListener)
@@ -97,7 +92,114 @@ rtsp.stop()
 
 ---
 
-Also you can just check camera is online or not.
+### 3) You can still use library with H264/H265 to YUV MediaImage decoding
+
+```kotlin
+val rtspStatusListener = object : RtspStatusListener {
+    override fun onConnecting() {}
+    override fun onConnected(sdpInfo: SdpInfo) {}
+    override fun onVideoNalUnitReceived(frame: Frame?) {}
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
+        if (mediaImage != null) {
+            // Just use it!
+            // Notice that you should use that sync on this thread
+            /**
+            val task = textRecognizer.process(InputImage.fromBitmap(mediaImage, 0))
+            val text = Tasks.await(task, 2000, TimeUnit.MILLISECONDS)
+             */
+        }
+    }
+    override fun onAudioSampleReceived(frame: Frame?) {
+        // Send raw audio to decoder
+    }
+    override fun onDisconnected() {}
+    override fun onUnauthorized() {}
+    override fun onFailed(message: String?) {}
+}
+// ... build rtsp
+rtsp.setStatusListener(rtspStatusListener)
+rtsp.setSurfaceView(null) // or don't set surface view
+rtsp.setRequestMediaImage(true)
+rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
+// ...
+rtsp.stop()
+```
+
+---
+
+### 4) You can still use library with H264/H265 to YUV ByteArray decoding
+
+```kotlin
+val rtspStatusListener = object : RtspStatusListener {
+    override fun onConnecting() {}
+    override fun onConnected(sdpInfo: SdpInfo) {}
+    override fun onVideoNalUnitReceived(frame: Frame?) {}
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
+        // you can decode YUV to Bitmap by Android New RenderScript Toolkit that integrated in the library 
+        // or your custom decoder
+        /**
+        if (yuv420Bytes != null) {
+            Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
+        }
+         */
+    }
+    override fun onAudioSampleReceived(frame: Frame?) {
+        // Send raw audio to decoder
+    }
+    override fun onDisconnected() {}
+    override fun onUnauthorized() {}
+    override fun onFailed(message: String?) {}
+}
+// ... build rtsp
+rtsp.setStatusListener(rtspStatusListener)
+rtsp.setSurfaceView(null) // or don't set surface view
+rtsp.setRequestYuvBytes(true)
+rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
+// ...
+rtsp.stop()
+```
+
+---
+
+
+### 5) You can still use library with H264/H265 to Bitmap decoding
+
+```kotlin
+val rtspStatusListener = object : RtspStatusListener {
+    override fun onConnecting() {}
+    override fun onConnected(sdpInfo: SdpInfo) {}
+    override fun onVideoNalUnitReceived(frame: Frame?) {}
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
+        if (bitmap != null) {
+            // Just use it!
+            /**
+            binding.img.run {
+                post { setImageBitmap(bitmap?.removeTimestamp()) }
+            } 
+             */
+        }
+    }
+    override fun onAudioSampleReceived(frame: Frame?) {
+        // Send raw audio to decoder
+    }
+    override fun onDisconnected() {}
+    override fun onUnauthorized() {}
+    override fun onFailed(message: String?) {}
+}
+// ... build rtsp
+rtsp.setStatusListener(rtspStatusListener)
+rtsp.setSurfaceView(null) // or don't set surface view
+rtsp.setRequestBitmap(true)
+rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
+// ...
+rtsp.stop()
+```
+
+
+---
+
+
+### Also you can just check camera is online or not.
 
 ```kotlin
 launch {

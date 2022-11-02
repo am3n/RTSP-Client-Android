@@ -73,10 +73,26 @@ class LiveFragment : Fragment() {
             }
         }
 
-        override fun onVideoFrameReceived(image: Image?, bitmap: Bitmap?) {
+        override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
+            Log.d(TAG, "onVideoFrameReceived()  mediaImage: $mediaImage   yuv420Bytes: $yuv420Bytes   bitmap: $bitmap")
+
+            /**
+            val task = textRecognizer.process(InputImage.fromBitmap(mediaImage, 0))
+            val text = Tasks.await(task, 2000, TimeUnit.MILLISECONDS)
+            */
+
+            /**
+            if (yuv420Bytes != null) {
+                Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
+            }
+            */
+
+            /**
             binding.img.run {
                 post { setImageBitmap(bitmap?.removeTimestamp()) }
             }
+            */
+
         }
 
         override fun onAudioSampleReceived(frame: Frame?) {
@@ -158,6 +174,9 @@ class LiveFragment : Fragment() {
 
         rtsp.setStatusListener(rtspStatusListener)
         rtsp.setSurfaceView(binding.svVideo)
+        //rtsp.setRequestMediaImage(true)
+        //rtsp.setRequestYuvBytes(true)
+        //rtsp.setRequestBitmap(true)
 
         return binding.root
     }

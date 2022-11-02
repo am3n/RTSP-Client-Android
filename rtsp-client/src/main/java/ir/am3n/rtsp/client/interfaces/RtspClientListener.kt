@@ -7,7 +7,7 @@ import ir.am3n.rtsp.client.data.SdpInfo
 internal interface RtspClientListener {
     fun onRtspConnected(sdpInfo: SdpInfo)
     fun onRtspVideoNalUnitReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long)
-    fun onRtspVideoFrameReceived(image: Image?, bitmap: Bitmap?)
+    fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?)
     fun onRtspAudioSampleReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long)
     fun onRtspDisconnected()
     fun onRtspFailedUnauthorized()

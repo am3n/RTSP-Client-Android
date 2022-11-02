@@ -41,7 +41,7 @@ class Rtsp {
                             stop()
                             it.resume(true)
                         }
-                        override fun onVideoFrameReceived(image: Image?, bitmap: Bitmap?) {}
+                        override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {}
                         override fun onAudioSampleReceived(frame: Frame?) {}
                         override fun onDisconnected() {
                             setStatusListener(null)
@@ -111,6 +111,9 @@ class Rtsp {
     private var password: String? = null
     private var userAgent: String? = null
     private var requestVideo = true
+    private var requestMediaImage = false
+    private var requestYuvBytes = false
+    private var requestBitmap = false
     private var requestAudio = true
     private var autoPlayAudio = true
     private var rtspThread: RtspThread? = null
@@ -182,9 +185,9 @@ class Rtsp {
             }
         }
 
-        override fun onRtspVideoFrameReceived(image: Image?, bitmap: Bitmap?) {
+        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
             uiHandler.post {
-                statusListener?.onVideoFrameReceived(image, bitmap)
+                statusListener?.onVideoFrameReceived(width, height, mediaImage, yuv420Bytes, bitmap)
             }
         }
 
@@ -280,6 +283,21 @@ class Rtsp {
         this.videoDecoder?.surfaceView = surfaceView
     }
 
+    fun setRequestMediaImage(requestMediaImage: Boolean) {
+        this.requestMediaImage = requestMediaImage
+        this.videoDecoder?.requestMediaImage = requestMediaImage
+    }
+
+    fun setRequestYuvBytes(requestYuvBytes: Boolean) {
+        this.requestYuvBytes = requestYuvBytes
+        this.videoDecoder?.requestYuvBytes = requestYuvBytes
+    }
+
+    fun setRequestBitmap(requestBitmap: Boolean) {
+        this.requestBitmap = requestBitmap
+        this.videoDecoder?.requestBitmap = requestBitmap
+    }
+
     private fun onRtspClientStarted() {
         if (DEBUG) Log.v(TAG, "onRtspClientStarted()")
         uiHandler.post { statusListener?.onConnecting() }
@@ -300,9 +318,8 @@ class Rtsp {
             surfaceView?.holder?.addCallback(surfaceCallback)
             videoDecoder?.stopAsync()
             videoDecoder = VideoDecoder(
-                surfaceView, videoMimeType,
-                sdpInfo.videoTrack!!.frameWidth, sdpInfo.videoTrack!!.frameHeight,
-                videoQueue, clientListener
+                surfaceView, requestMediaImage, requestYuvBytes, requestBitmap, videoMimeType,
+                sdpInfo.videoTrack!!.frameWidth, sdpInfo.videoTrack!!.frameHeight, videoQueue, clientListener
             )
             videoDecoder!!.start()
         }
