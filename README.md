@@ -56,6 +56,13 @@ val username = "admin"
 val password = "secret"
 val rtsp = Rtsp()
 rtsp.init(uri, username, password)
+rtsp.setStatusListener(object : RtspStatusListener {
+    override fun onConnecting() {}
+    override fun onConnected(sdpInfo: SdpInfo) {}
+    override fun onDisconnected() {}
+    override fun onUnauthorized() {}
+    override fun onFailed(message: String?) {}
+})
 rtsp.setSurfaceView(binding.svVideo)
 rtsp.start()
 // ...
@@ -68,9 +75,8 @@ rtsp.stop()
 e.g. for writing video stream into MP4 via muxer.
 
 ```kotlin
-val rtspStatusListener = object : RtspStatusListener {
-    override fun onConnecting() {}
-    override fun onConnected(sdpInfo: SdpInfo) {}
+// ... build rtsp
+rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {
         // Send raw H264/H265 NAL unit to decoder
     }
@@ -78,13 +84,7 @@ val rtspStatusListener = object : RtspStatusListener {
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
-    override fun onDisconnected() {}
-    override fun onUnauthorized() {}
-    override fun onFailed(message: String?) {}
-}
-// ... build rtsp
-rtsp.setStatusListener(rtspStatusListener)
-rtsp.setSurfaceView(null) // or don't set surface view
+})
 rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
 // ...
 rtsp.stop()
@@ -95,9 +95,8 @@ rtsp.stop()
 ### 3) You can still use library with H264/H265 to YUV MediaImage decoding
 
 ```kotlin
-val rtspStatusListener = object : RtspStatusListener {
-    override fun onConnecting() {}
-    override fun onConnected(sdpInfo: SdpInfo) {}
+// ... build rtsp
+rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {}
     override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
         if (mediaImage != null) {
@@ -112,13 +111,7 @@ val rtspStatusListener = object : RtspStatusListener {
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
-    override fun onDisconnected() {}
-    override fun onUnauthorized() {}
-    override fun onFailed(message: String?) {}
-}
-// ... build rtsp
-rtsp.setStatusListener(rtspStatusListener)
-rtsp.setSurfaceView(null) // or don't set surface view
+})
 rtsp.setRequestMediaImage(true)
 rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
 // ...
@@ -130,29 +123,22 @@ rtsp.stop()
 ### 4) You can still use library with H264/H265 to YUV ByteArray decoding
 
 ```kotlin
-val rtspStatusListener = object : RtspStatusListener {
-    override fun onConnecting() {}
-    override fun onConnected(sdpInfo: SdpInfo) {}
+// ... build rtsp
+rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {}
     override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
         // you can decode YUV to Bitmap by Android New RenderScript Toolkit that integrated in the library 
         // or your custom decoder
         /**
         if (yuv420Bytes != null) {
-            Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
+        Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
         }
          */
     }
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
-    override fun onDisconnected() {}
-    override fun onUnauthorized() {}
-    override fun onFailed(message: String?) {}
-}
-// ... build rtsp
-rtsp.setStatusListener(rtspStatusListener)
-rtsp.setSurfaceView(null) // or don't set surface view
+})
 rtsp.setRequestYuvBytes(true)
 rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
 // ...
@@ -165,30 +151,23 @@ rtsp.stop()
 ### 5) You can still use library with H264/H265 to Bitmap decoding
 
 ```kotlin
-val rtspStatusListener = object : RtspStatusListener {
-    override fun onConnecting() {}
-    override fun onConnected(sdpInfo: SdpInfo) {}
+// ... build rtsp
+rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {}
     override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
         if (bitmap != null) {
             // Just use it!
             /**
             binding.img.run {
-                post { setImageBitmap(bitmap?.removeTimestamp()) }
-            } 
+            post { setImageBitmap(bitmap?.removeTimestamp()) }
+            }
              */
         }
     }
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
-    override fun onDisconnected() {}
-    override fun onUnauthorized() {}
-    override fun onFailed(message: String?) {}
-}
-// ... build rtsp
-rtsp.setStatusListener(rtspStatusListener)
-rtsp.setSurfaceView(null) // or don't set surface view
+})
 rtsp.setRequestBitmap(true)
 rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
 // ...
@@ -215,3 +194,6 @@ launch {
 
 * https://github.com/alexeyvasilyev/rtsp-client-android
 
+
+
+ 

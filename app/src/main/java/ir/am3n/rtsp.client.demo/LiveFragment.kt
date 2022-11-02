@@ -15,6 +15,7 @@ import ir.am3n.rtsp.client.Rtsp
 import ir.am3n.rtsp.client.data.Frame
 import ir.am3n.rtsp.client.data.SdpInfo
 import ir.am3n.rtsp.client.demo.databinding.FragmentLiveBinding
+import ir.am3n.rtsp.client.interfaces.RtspFrameListener
 import ir.am3n.rtsp.client.interfaces.RtspStatusListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,13 +35,14 @@ class LiveFragment : Fragment() {
 
     private val rtsp = Rtsp()
 
+    @Volatile
+    private var disconnectCount = 0
+
     private var frameCounter = 0
     private var frameTimestamp = System.currentTimeMillis()
 
-    private val rtspStatusListener = object : RtspStatusListener {
 
-        @Volatile
-        private var disconnectCount = 0
+    private val rtspStatusListener = object : RtspStatusListener {
 
         override fun onConnecting() {
             binding.tvFrameRate.text = ""
@@ -55,48 +57,6 @@ class LiveFragment : Fragment() {
             binding.tvStatus.text = "RTSP connected"
             binding.bnStartStop.text = "Stop RTSP"
             binding.pbLoading.visibility = View.GONE
-        }
-
-        override fun onVideoNalUnitReceived(frame: Frame?) {
-            disconnectCount = 0
-            frameCounter++
-            val now = System.currentTimeMillis()
-            val diff = now - frameTimestamp
-            if (diff in 1000..1500) {
-                binding.tvFrameRate.text = "$frameCounter fps"
-                frameCounter = 0
-                frameTimestamp = now
-            } else if (diff > 1500) {
-                binding.tvFrameRate.text = "timeout"
-                frameCounter = 0
-                frameTimestamp = now
-            }
-        }
-
-        override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
-            Log.d(TAG, "onVideoFrameReceived()  mediaImage: $mediaImage   yuv420Bytes: $yuv420Bytes   bitmap: $bitmap")
-
-            /**
-            val task = textRecognizer.process(InputImage.fromBitmap(mediaImage, 0))
-            val text = Tasks.await(task, 2000, TimeUnit.MILLISECONDS)
-            */
-
-            /**
-            if (yuv420Bytes != null) {
-                Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
-            }
-            */
-
-            /**
-            binding.img.run {
-                post { setImageBitmap(bitmap?.removeTimestamp()) }
-            }
-            */
-
-        }
-
-        override fun onAudioSampleReceived(frame: Frame?) {
-
         }
 
         override fun onDisconnected() {
@@ -133,6 +93,54 @@ class LiveFragment : Fragment() {
         }
 
     }
+
+
+    private val rtspFrameListener = object : RtspFrameListener {
+
+        override fun onVideoNalUnitReceived(frame: Frame?) {
+            disconnectCount = 0
+            frameCounter++
+            val now = System.currentTimeMillis()
+            val diff = now - frameTimestamp
+            if (diff in 1000..1500) {
+                binding.tvFrameRate.text = "$frameCounter fps"
+                frameCounter = 0
+                frameTimestamp = now
+            } else if (diff > 1500) {
+                binding.tvFrameRate.text = "timeout"
+                frameCounter = 0
+                frameTimestamp = now
+            }
+        }
+
+        override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
+            Log.d(TAG, "onVideoFrameReceived()  mediaImage: $mediaImage   yuv420Bytes: $yuv420Bytes   bitmap: $bitmap")
+
+            /**
+            val task = textRecognizer.process(InputImage.fromBitmap(mediaImage, 0))
+            val text = Tasks.await(task, 2000, TimeUnit.MILLISECONDS)
+             */
+
+            /**
+            if (yuv420Bytes != null) {
+            Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
+            }
+             */
+
+            /**
+            binding.img.run {
+            post { setImageBitmap(bitmap?.removeTimestamp()) }
+            }
+             */
+
+        }
+
+        override fun onAudioSampleReceived(frame: Frame?) {
+
+        }
+
+    }
+
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         if (DEBUG) Log.v(TAG, "onCreateView()")
@@ -173,6 +181,7 @@ class LiveFragment : Fragment() {
         }
 
         rtsp.setStatusListener(rtspStatusListener)
+        rtsp.setFrameListener(rtspFrameListener)
         rtsp.setSurfaceView(binding.svVideo)
         //rtsp.setRequestMediaImage(true)
         //rtsp.setRequestYuvBytes(true)

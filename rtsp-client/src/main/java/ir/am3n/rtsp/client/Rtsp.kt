@@ -14,6 +14,7 @@ import ir.am3n.rtsp.client.codec.VideoDecoder
 import ir.am3n.rtsp.client.data.Frame
 import ir.am3n.rtsp.client.data.SdpInfo
 import ir.am3n.rtsp.client.interfaces.RtspClientListener
+import ir.am3n.rtsp.client.interfaces.RtspFrameListener
 import ir.am3n.rtsp.client.interfaces.RtspStatusListener
 import ir.am3n.utils.NetUtils
 import java.net.Socket
@@ -36,27 +37,31 @@ class Rtsp {
                     setStatusListener(object : RtspStatusListener {
                         override fun onConnecting() {}
                         override fun onConnected(sdpInfo: SdpInfo) {}
+                        override fun onDisconnected() {
+                            setStatusListener(null)
+                            setFrameListener(null)
+                            it.resume(false)
+                        }
+                        override fun onUnauthorized() {
+                            setStatusListener(null)
+                            setFrameListener(null)
+                            it.resume(true)
+                        }
+                        override fun onFailed(message: String?) {
+                            setStatusListener(null)
+                            setFrameListener(null)
+                            it.resume(false)
+                        }
+                    })
+                    setFrameListener(object : RtspFrameListener {
                         override fun onVideoNalUnitReceived(frame: Frame?) {
                             setStatusListener(null)
+                            setFrameListener(null)
                             stop()
                             it.resume(true)
                         }
                         override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {}
                         override fun onAudioSampleReceived(frame: Frame?) {}
-                        override fun onDisconnected() {
-                            setStatusListener(null)
-                            it.resume(false)
-                        }
-
-                        override fun onUnauthorized() {
-                            setStatusListener(null)
-                            it.resume(true)
-                        }
-
-                        override fun onFailed(message: String?) {
-                            setStatusListener(null)
-                            it.resume(false)
-                        }
                     })
                     start(requestVideo = true, requestAudio = false, autoPlayAudio = false)
                 }
@@ -122,9 +127,11 @@ class Rtsp {
     private var videoDecoder: VideoDecoder? = null
     private var audioDecoder: AudioDecoder? = null
 
-    private var surfaceView: SurfaceView? = null
     private var statusListener: RtspStatusListener? = null
+    private var frameListener: RtspFrameListener? = null
     private val uiHandler = Handler(Looper.getMainLooper())
+
+    private var surfaceView: SurfaceView? = null
     private var videoMimeType: String = "video/avc"
     private var audioMimeType: String = ""
     private var audioSampleRate: Int = 0
@@ -175,11 +182,11 @@ class Rtsp {
             if (length > 0) {
                 videoQueue.push(Frame(data, offset, length, timestamp))
                 uiHandler.post {
-                    statusListener?.onVideoNalUnitReceived(Frame(data, offset, length, timestamp))
+                    frameListener?.onVideoNalUnitReceived(Frame(data, offset, length, timestamp))
                 }
             } else {
                 uiHandler.post {
-                    statusListener?.onVideoNalUnitReceived(null)
+                    frameListener?.onVideoNalUnitReceived(null)
                 }
                 if (DEBUG) Log.e(TAG, "onRtspVideoNalUnitReceived() zero length")
             }
@@ -187,7 +194,7 @@ class Rtsp {
 
         override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
             uiHandler.post {
-                statusListener?.onVideoFrameReceived(width, height, mediaImage, yuv420Bytes, bitmap)
+                frameListener?.onVideoFrameReceived(width, height, mediaImage, yuv420Bytes, bitmap)
             }
         }
 
@@ -195,11 +202,11 @@ class Rtsp {
             if (length > 0) {
                 audioQueue.push(Frame(data, offset, length, timestamp))
                 uiHandler.post {
-                    statusListener?.onAudioSampleReceived(Frame(data, offset, length, timestamp))
+                    frameListener?.onAudioSampleReceived(Frame(data, offset, length, timestamp))
                 }
             } else {
                 uiHandler.post {
-                    statusListener?.onAudioSampleReceived(null)
+                    frameListener?.onAudioSampleReceived(null)
                 }
                 if (DEBUG) Log.e(TAG, "onRtspAudioSampleReceived() zero length")
             }
@@ -276,6 +283,11 @@ class Rtsp {
     fun setStatusListener(listener: RtspStatusListener?) {
         if (DEBUG) Log.v(TAG, "setStatusListener()")
         this.statusListener = listener
+    }
+
+    fun setFrameListener(listener: RtspFrameListener?) {
+        if (DEBUG) Log.v(TAG, "setFrameListener()")
+        this.frameListener = listener
     }
 
     fun setSurfaceView(surfaceView: SurfaceView?) {
