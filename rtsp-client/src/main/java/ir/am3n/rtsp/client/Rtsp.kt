@@ -181,33 +181,23 @@ class Rtsp {
         override fun onRtspVideoNalUnitReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
             if (length > 0) {
                 videoQueue.push(Frame(data, offset, length, timestamp))
-                uiHandler.post {
-                    frameListener?.onVideoNalUnitReceived(Frame(data, offset, length, timestamp))
-                }
+                frameListener?.onVideoNalUnitReceived(Frame(data, offset, length, timestamp))
             } else {
-                uiHandler.post {
-                    frameListener?.onVideoNalUnitReceived(null)
-                }
+                frameListener?.onVideoNalUnitReceived(null)
                 if (DEBUG) Log.e(TAG, "onRtspVideoNalUnitReceived() zero length")
             }
         }
 
         override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
-            uiHandler.post {
-                frameListener?.onVideoFrameReceived(width, height, mediaImage, yuv420Bytes, bitmap)
-            }
+            frameListener?.onVideoFrameReceived(width, height, mediaImage, yuv420Bytes, bitmap)
         }
 
         override fun onRtspAudioSampleReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
             if (length > 0) {
                 audioQueue.push(Frame(data, offset, length, timestamp))
-                uiHandler.post {
-                    frameListener?.onAudioSampleReceived(Frame(data, offset, length, timestamp))
-                }
+                frameListener?.onAudioSampleReceived(Frame(data, offset, length, timestamp))
             } else {
-                uiHandler.post {
-                    frameListener?.onAudioSampleReceived(null)
-                }
+                frameListener?.onAudioSampleReceived(null)
                 if (DEBUG) Log.e(TAG, "onRtspAudioSampleReceived() zero length")
             }
         }
