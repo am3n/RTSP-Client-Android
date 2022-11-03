@@ -13,7 +13,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal class VideoDecoder(
-    var surfaceView: SurfaceView?,
+    private var surfaceView: SurfaceView?,
     var requestMediaImage: Boolean,
     var requestYuvBytes: Boolean,
     var requestBitmap: Boolean,
@@ -44,17 +44,12 @@ internal class VideoDecoder(
         srcRect.bottom = height
         dstRect.right = width
         dstRect.bottom = height
-        surfaceView?.post {
-            if (width > height) {
-                val rate = (surfaceView?.measuredWidth ?: 0).toFloat() / width.toFloat()
-                val height = (height * rate).toInt()
-                surfaceView?.holder?.setFixedSize(width, height)
-            } else {
-                val rate = (surfaceView?.measuredHeight ?: 0).toFloat() / height.toFloat()
-                val width = (width * rate).toInt()
-                surfaceView?.holder?.setFixedSize(width, height)
-            }
-        }
+        fixSurfaceSize()
+    }
+
+    fun setSurfaceView(surfaceView: SurfaceView?) {
+        this.surfaceView = surfaceView
+        fixSurfaceSize()
     }
 
     fun stopAsync() {
@@ -145,6 +140,20 @@ internal class VideoDecoder(
         }
 
         if (DEBUG) Log.d(TAG, "$name stopped")
+    }
+
+    private fun fixSurfaceSize() {
+        surfaceView?.post {
+            if (width > height) {
+                val rate = (surfaceView?.measuredWidth ?: 0).toFloat() / width.toFloat()
+                val height = (height * rate).toInt()
+                surfaceView?.holder?.setFixedSize(width, height)
+            } else {
+                val rate = (surfaceView?.measuredHeight ?: 0).toFloat() / height.toFloat()
+                val width = (width * rate).toInt()
+                surfaceView?.holder?.setFixedSize(width, height)
+            }
+        }
     }
 
     private fun decodeYuv(decoder: MediaCodec, info: MediaCodec.BufferInfo, index: Int) {

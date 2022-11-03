@@ -285,7 +285,7 @@ class Rtsp {
 
     fun setSurfaceView(surfaceView: SurfaceView?) {
         this.surfaceView = surfaceView
-        this.videoDecoder?.surfaceView = surfaceView
+        this.videoDecoder?.setSurfaceView(surfaceView)
     }
 
     fun setRequestMediaImage(requestMediaImage: Boolean) {
