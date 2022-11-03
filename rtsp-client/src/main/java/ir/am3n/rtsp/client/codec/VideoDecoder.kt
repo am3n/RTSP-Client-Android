@@ -160,7 +160,7 @@ internal class VideoDecoder(
             val yuv420ByteArray = ByteArray(buffer.remaining())
             buffer.get(yuv420ByteArray)
 
-            val bitmap = if (surfaceView != null || requestBitmap) {
+            val bitmap = if (surfaceView?.holder?.surface?.isValid == true || requestBitmap) {
                 try {
                     Toolkit.yuvToRgbBitmap(yuv420ByteArray, width, height, YuvFormat.YUV_420_888)
                 } catch (t: Throwable) {
@@ -170,7 +170,6 @@ internal class VideoDecoder(
             } else {
                 null
             }
-
 
             if (bitmap != null) {
                 surfaceView?.post {
