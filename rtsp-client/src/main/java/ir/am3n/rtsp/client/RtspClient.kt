@@ -316,7 +316,7 @@ internal class RtspClient private constructor(builder: Builder) {
                 }
 
             } else {
-                listener.onRtspFailed("No tracks found. RTSP server issue.")
+                throw Exception("No tracks found. RTSP server issue.")
             }
 
             listener.onRtspDisconnected()
@@ -327,9 +327,9 @@ internal class RtspClient private constructor(builder: Builder) {
         } catch (e: InterruptedException) {
             // Thread interrupted. Expected behavior.
             listener.onRtspDisconnected()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            listener.onRtspFailed(e.message)
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            listener.onRtspFailed(t.message)
         }
         try {
             rtspSocket.close()

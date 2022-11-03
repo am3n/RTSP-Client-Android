@@ -60,6 +60,7 @@ class LiveFragment : Fragment() {
         }
 
         override fun onDisconnected() {
+            if (DEBUG) Log.d(TAG, "onDisconnected()")
             disconnectCount++
             binding.tvFrameRate.text = ""
             binding.tvStatus.text = "RTSP disconnected"
@@ -98,18 +99,20 @@ class LiveFragment : Fragment() {
     private val rtspFrameListener = object : RtspFrameListener {
 
         override fun onVideoNalUnitReceived(frame: Frame?) {
-            disconnectCount = 0
-            frameCounter++
-            val now = System.currentTimeMillis()
-            val diff = now - frameTimestamp
-            if (diff in 1000..1500) {
-                binding.tvFrameRate.text = "$frameCounter fps"
-                frameCounter = 0
-                frameTimestamp = now
-            } else if (diff > 1500) {
-                binding.tvFrameRate.text = "timeout"
-                frameCounter = 0
-                frameTimestamp = now
+            view?.post {
+                disconnectCount = 0
+                frameCounter++
+                val now = System.currentTimeMillis()
+                val diff = now - frameTimestamp
+                if (diff in 1000..1500) {
+                    binding.tvFrameRate.text = "$frameCounter fps"
+                    frameCounter = 0
+                    frameTimestamp = now
+                } else if (diff > 1500) {
+                    binding.tvFrameRate.text = "timeout"
+                    frameCounter = 0
+                    frameTimestamp = now
+                }
             }
         }
 

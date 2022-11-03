@@ -309,7 +309,6 @@ class Rtsp {
         if (DEBUG) Log.v(TAG, "onRtspClientStopped()")
         stopDecoders()
         rtspThread = null
-        uiHandler.post { statusListener?.onDisconnected() }
     }
 
 
