@@ -103,12 +103,15 @@ class Rtsp {
                 rtspClient.execute()
 
                 NetUtils.closeSocket(socket)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            onRtspClientStopped()
-        }
 
+                onRtspClientStopped()
+
+            } catch (t: Throwable) {
+                t.printStackTrace()
+                onRtspClientStopped()
+                clientListener.onRtspFailed(t.message)
+            }
+        }
     }
 
     private lateinit var uri: Uri
