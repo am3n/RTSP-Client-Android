@@ -26,11 +26,10 @@ internal class VideoDecoder(
 
     companion object {
         private const val TAG: String = "VideoDecoder"
-        private const val DEBUG = false
+        private const val DEBUG = true
     }
 
-    private val srcRect = Rect()
-    private val dstRect = Rect()
+    private val rect = Rect()
     private var exitFlag: AtomicBoolean = AtomicBoolean(false)
 
     /*private var timestamp = System.currentTimeMillis()
@@ -40,10 +39,6 @@ internal class VideoDecoder(
 
     init {
         name = "RTSP video thread"
-        srcRect.right = width
-        srcRect.bottom = height
-        dstRect.right = width
-        dstRect.bottom = height
         fixSurfaceSize()
     }
 
@@ -143,15 +138,23 @@ internal class VideoDecoder(
     }
 
     private fun fixSurfaceSize() {
+        if (DEBUG) Log.d(TAG, "fixSurfaceSize()  width: $width   height: $height   " +
+                "sw: ${surfaceView?.measuredWidth}  sh: ${surfaceView?.measuredHeight}")
         surfaceView?.post {
             if (width > height) {
                 val rate = (surfaceView?.measuredWidth ?: 0).toFloat() / width.toFloat()
                 val height = (height * rate).toInt()
-                surfaceView?.holder?.setFixedSize(width, height)
+                surfaceView?.holder?.setFixedSize(surfaceView!!.measuredWidth, height)
+                rect.right = surfaceView!!.measuredWidth
+                rect.bottom = height
+                if (DEBUG) Log.d(TAG, "fixSurfaceSize()   set  width: ${surfaceView!!.measuredWidth}   height: $height")
             } else {
                 val rate = (surfaceView?.measuredHeight ?: 0).toFloat() / height.toFloat()
                 val width = (width * rate).toInt()
-                surfaceView?.holder?.setFixedSize(width, height)
+                surfaceView?.holder?.setFixedSize(width, surfaceView!!.measuredHeight)
+                rect.right = width
+                rect.bottom = surfaceView!!.measuredHeight
+                if (DEBUG) Log.d(TAG, "fixSurfaceSize()   set  width: $width   height: ${surfaceView!!.measuredHeight}")
             }
         }
     }
@@ -184,8 +187,8 @@ internal class VideoDecoder(
                 surfaceView?.post {
                     surfaceView?.holder?.surface?.run {
                         if (isValid) {
-                            lockCanvas(dstRect)?.run {
-                                drawBitmap(bitmap, srcRect, dstRect, null)
+                            lockCanvas(rect)?.run {
+                                drawBitmap(bitmap, null, rect, null)
                                 unlockCanvasAndPost(this)
                             }
                         }
