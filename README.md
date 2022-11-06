@@ -193,7 +193,7 @@ launch {
 ## Credits
 
 * https://github.com/alexeyvasilyev/rtsp-client-android
-
+* https://github.com/android/renderscript-intrinsics-replacement-toolkit
 
 
  
