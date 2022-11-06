@@ -5,6 +5,9 @@ import android.media.Image
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
+import android.os.Process.THREAD_PRIORITY_VIDEO
+import android.os.Process.setThreadPriority
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -76,6 +79,7 @@ class Rtsp {
 
         init {
             name = "RTSP IO thread"
+            setThreadPriority(THREAD_PRIORITY_VIDEO)
         }
 
         fun stopAsync() {

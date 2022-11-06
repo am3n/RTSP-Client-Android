@@ -4,6 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.media.MediaCodec
 import android.media.MediaFormat
+import android.os.Process
+import android.os.Process.THREAD_PRIORITY_VIDEO
+import android.os.Process.setThreadPriority
 import android.util.Log
 import android.view.SurfaceView
 import com.google.android.renderscript.Toolkit
@@ -39,6 +42,7 @@ internal class VideoDecoder(
 
     init {
         name = "RTSP video thread"
+        setThreadPriority(THREAD_PRIORITY_VIDEO)
         fixSurfaceSize()
     }
 
