@@ -131,7 +131,7 @@ rtsp.setFrameListener(object : RtspFrameListener {
         // or your custom decoder
         /**
         if (yuv420Bytes != null) {
-        Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
+            Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
         }
          */
     }
@@ -159,7 +159,7 @@ rtsp.setFrameListener(object : RtspFrameListener {
             // Just use it!
             /**
             binding.img.run {
-            post { setImageBitmap(bitmap?.removeTimestamp()) }
+                post { setImageBitmap(bitmap?.removeTimestamp()) }
             }
              */
         }
@@ -193,7 +193,7 @@ launch {
 ## Credits
 
 * https://github.com/alexeyvasilyev/rtsp-client-android
-
+* https://github.com/android/renderscript-intrinsics-replacement-toolkit
 
 
  
