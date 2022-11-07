@@ -67,6 +67,23 @@ class LiveFragment : Fragment() {
             binding.bnStartStop.text = "Start RTSP"
             binding.pbLoading.visibility = View.GONE
             binding.etRtspRequest.isEnabled = true
+            onError()
+        }
+
+        override fun onUnauthorized() {
+            binding.tvFrameRate.text = ""
+            binding.tvStatus.text = "RTSP username or password invalid"
+            binding.pbLoading.visibility = View.GONE
+            onError()
+        }
+
+        override fun onFailed(message: String?) {
+            binding.tvStatus.text = "Error: $message"
+            binding.pbLoading.visibility = View.GONE
+            onError()
+        }
+
+        private fun onError() {
             if (disconnectCount < 3) {
                 rtsp.start()
             } else {
@@ -80,17 +97,6 @@ class LiveFragment : Fragment() {
                     rtsp.start()
                 }
             }
-        }
-
-        override fun onUnauthorized() {
-            binding.tvFrameRate.text = ""
-            binding.tvStatus.text = "RTSP username or password invalid"
-            binding.pbLoading.visibility = View.GONE
-        }
-
-        override fun onFailed(message: String?) {
-            binding.tvStatus.text = "Error: $message"
-            binding.pbLoading.visibility = View.GONE
         }
 
     }

@@ -25,13 +25,10 @@ object NetUtils {
     @Throws(Exception::class)
     fun createSocketAndConnect(dstUri: Uri, dstPort: Int, timeout: Int): Socket {
         Log.v(TAG, "createSocketAndConnect(dstUri=$dstUri, dstPort=$dstPort, timeout=$timeout)")
-        return if (dstUri.scheme!!.lowercase().equals("rtsps", ignoreCase = true)) createSslSocketAndConnect(
-            dstUri.host!!,
-            dstPort,
-            timeout
-        ) else createSocketAndConnect(
-            dstUri.host!!, dstPort, timeout
-        )
+        return if (dstUri.scheme!!.lowercase().equals("rtsps", ignoreCase = true))
+            createSslSocketAndConnect(dstUri.host!!, dstPort, timeout)
+        else
+            createSocketAndConnect(dstUri.host!!, dstPort, timeout)
     }
 
     @Throws(Exception::class)

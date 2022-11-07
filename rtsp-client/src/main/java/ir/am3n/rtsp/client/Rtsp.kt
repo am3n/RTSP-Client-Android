@@ -5,9 +5,7 @@ import android.media.Image
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.os.Process
-import android.os.Process.THREAD_PRIORITY_VIDEO
-import android.os.Process.setThreadPriority
+import android.os.Process.*
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -79,7 +77,7 @@ class Rtsp {
 
         init {
             name = "RTSP IO thread"
-            setThreadPriority(THREAD_PRIORITY_VIDEO)
+            setThreadPriority(THREAD_PRIORITY_URGENT_AUDIO)
         }
 
         fun stopAsync() {
@@ -251,8 +249,14 @@ class Rtsp {
     fun init(url: String, username: String? = null, password: String? = null, userAgent: String? = null) {
         if (DEBUG) Log.v(TAG, "init(uri='$url', username=$username, password=$password, userAgent='$userAgent')")
         this.uri = Uri.parse(url)
-        this.username = username
-        this.password = password
+        var urlUsername: String? = null
+        var urlPassword: String? = null
+        Regex("//.*:.*@").find(url)?.value?.replace("//", "")?.replace("@", "")?.split(":")?.let {
+            urlUsername = it[0]
+            urlPassword = it[1]
+        }
+        this.username = username ?: urlUsername
+        this.password = password ?: urlPassword
         this.userAgent = userAgent
     }
 
