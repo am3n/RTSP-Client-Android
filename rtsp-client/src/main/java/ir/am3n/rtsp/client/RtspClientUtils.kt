@@ -103,7 +103,7 @@ internal object RtspClientUtils {
         var keepAliveSent = System.currentTimeMillis()
         while (!exitFlag.get()) {
 
-            //Log.d(TAG, "readRdpData() > readHeader()");
+            //Log.d(TAG, "readRdpData() > readHeader()")
             val header = RtpParser.readHeader(inputStream)
                 ?: throw IOException("No RTP frame header found")
 
@@ -111,7 +111,7 @@ internal object RtspClientUtils {
                 data = ByteArray(header.payloadSize)
             }
 
-            //Log.d(TAG, "readRdpData() > readData()");
+            //Log.d(TAG, "readRdpData() > readData()")
             NetUtils.readData(inputStream, data, 0, header.payloadSize)
 
             // Check if keep-alive should be sent
@@ -121,7 +121,7 @@ internal object RtspClientUtils {
                 keepAliveListener.onRtspKeepAliveRequested()
             }
 
-            //Log.d(TAG, "readRdpData() > check track & payloadType");
+            //Log.d(TAG, "readRdpData() > check track & payloadType")
 
             // Video
             if (header.payloadType == sdpInfo.videoTrack?.payloadType) {
@@ -599,12 +599,12 @@ internal object RtspClientUtils {
             md.update(nonce.toByteArray(StandardCharsets.ISO_8859_1))
             md.update(':'.code.toByte())
             // TODO add support for more secure version of digest auth
-            //md.update(nc.getBytes(StandardCharsets.ISO_8859_1));
-            //md.update((byte) ':');
-            //md.update(cnonce.getBytes(StandardCharsets.ISO_8859_1));
-            //md.update((byte) ':');
-            //md.update(qop.getBytes(StandardCharsets.ISO_8859_1));
-            //md.update((byte) ':');
+            //md.update(nc.getBytes(StandardCharsets.ISO_8859_1))
+            //md.update((byte) ':')
+            //md.update(cnonce.getBytes(StandardCharsets.ISO_8859_1))
+            //md.update((byte) ':')
+            //md.update(qop.getBytes(StandardCharsets.ISO_8859_1))
+            //md.update((byte) ':')
             md.update(getHexStringFromBytes(ha2).toByteArray(StandardCharsets.ISO_8859_1))
             val response = getHexStringFromBytes(md.digest())
             return "Digest username=\"$clientUsername\", realm=\"$realm\", nonce=\"$nonce\", uri=\"$digestUri\", response=\"$response\""
@@ -628,7 +628,7 @@ internal object RtspClientUtils {
         return String(b, 0, read)
     }
 
-    // int memcmp ( const void * ptr1, const void * ptr2, size_t num );
+    // int memcmp ( const void * ptr1, const void * ptr2, size_t num )
     fun memcmp(
         source1: ByteArray,
         offsetSource1: Int,

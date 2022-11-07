@@ -303,7 +303,7 @@ internal class RtspClient private constructor(builder: Builder) {
 
                 // Blocking call unless exitFlag set to true, thread.interrupt() called or connection closed.
                 try {
-                    readRtpData(inputStream, sdpInfo, exitFlag, listener, keepAliveTimeout = sessionTimeout / 2 * 1000, keepAliveListener)
+                    readRtpData(inputStream, sdpInfo, exitFlag, listener, keepAliveTimeout = sessionTimeout / 4 * 1000, keepAliveListener)
                 } catch (t: Throwable) {
                     t.printStackTrace()
                 } finally {

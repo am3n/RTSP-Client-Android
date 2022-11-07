@@ -32,7 +32,8 @@ internal object RtpParser {
                 val foundHeader = RtpHeader.searchForNextRtpHeader(inputStream, header)
                 if (foundHeader) {
                     packetSize = RtpHeader.getPacketSize(header)
-                    if (readData(inputStream, header, 0, header.size) == header.size) return RtpHeader.parseData(header, packetSize)
+                    if (readData(inputStream, header, 0, header.size) == header.size)
+                        return RtpHeader.parseData(header, packetSize)
                 }
             } else {
                 return rtpHeader
