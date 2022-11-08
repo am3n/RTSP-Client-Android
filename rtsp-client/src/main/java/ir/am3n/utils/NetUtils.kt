@@ -23,7 +23,7 @@ object NetUtils {
     private const val MAX_LINE_SIZE = 4098
 
     @Throws(Exception::class)
-    fun createSocketAndConnect(dstUri: Uri, dstPort: Int, timeout: Int): Socket {
+    fun createSocketAndConnect(dstUri: Uri, dstPort: Int, timeout: Long): Socket {
         Log.v(TAG, "createSocketAndConnect(dstUri=$dstUri, dstPort=$dstPort, timeout=$timeout)")
         return if (dstUri.scheme!!.lowercase().equals("rtsps", ignoreCase = true))
             createSslSocketAndConnect(dstUri.host!!, dstPort, timeout)
@@ -32,7 +32,7 @@ object NetUtils {
     }
 
     @Throws(Exception::class)
-    fun createSslSocketAndConnect(dstName: String, dstPort: Int, timeout: Int): SSLSocket {
+    fun createSslSocketAndConnect(dstName: String, dstPort: Int, timeout: Long): SSLSocket {
         Log.v(TAG, "createSslSocketAndConnect(dstName=$dstName, dstPort=$dstPort, timeout=$timeout)")
 
 //        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
@@ -45,27 +45,27 @@ object NetUtils {
         val sslContext = SSLContext.getInstance("TLS")
         sslContext.init(null, arrayOf<TrustManager>(FakeX509TrustManager()), null)
         val sslSocket = sslContext.socketFactory.createSocket() as SSLSocket
-        sslSocket.connect(InetSocketAddress(dstName, dstPort), timeout)
+        sslSocket.connect(InetSocketAddress(dstName, dstPort), timeout.toInt())
         sslSocket.setSoLinger(false, 1)
-        sslSocket.soTimeout = timeout
+        sslSocket.soTimeout = timeout.toInt()
         return sslSocket
     }
 
     @Throws(IOException::class)
-    fun createSocketAndConnect(dstName: String, dstPort: Int, timeout: Int): Socket {
+    fun createSocketAndConnect(dstName: String, dstPort: Int, timeout: Long): Socket {
         Log.v(TAG, "createSocketAndConnect(dstName=$dstName, dstPort=$dstPort, timeout=$timeout)")
         val socket = Socket()
-        socket.connect(InetSocketAddress(dstName, dstPort), timeout)
+        socket.connect(InetSocketAddress(dstName, dstPort), timeout.toInt())
         socket.setSoLinger(false, 1)
-        socket.soTimeout = timeout
+        socket.soTimeout = timeout.toInt()
         return socket
     }
 
     @Throws(IOException::class)
-    fun createSocket(timeout: Int): Socket {
+    fun createSocket(timeout: Long): Socket {
         val socket = Socket()
         socket.setSoLinger(false, 1) // 1 sec for flush() before close()
-        socket.soTimeout = timeout // 10 sec timeout for read(), not for write()
+        socket.soTimeout = timeout.toInt() // 10 sec timeout for read(), not for write()
         return socket
     }
 

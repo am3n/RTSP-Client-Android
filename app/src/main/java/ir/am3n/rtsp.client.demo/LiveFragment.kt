@@ -71,6 +71,7 @@ class LiveFragment : Fragment() {
         }
 
         override fun onUnauthorized() {
+            disconnectCount++
             binding.tvFrameRate.text = ""
             binding.tvStatus.text = "RTSP username or password invalid"
             binding.pbLoading.visibility = View.GONE
@@ -78,6 +79,7 @@ class LiveFragment : Fragment() {
         }
 
         override fun onFailed(message: String?) {
+            disconnectCount++
             binding.tvStatus.text = "Error: $message"
             binding.pbLoading.visibility = View.GONE
             onError()
@@ -181,11 +183,12 @@ class LiveFragment : Fragment() {
         }
 
         binding.bnStartStop.setOnClickListener {
+            liveViewModel.saveParams(requireContext())
             if (rtsp.isStarted()) {
                 rtsp.stop()
             } else {
-                rtsp.init(liveViewModel.rtspRequest.value!!)
-                rtsp.start(requestVideo = true, requestAudio = true, autoPlayAudio = true)
+                rtsp.init(liveViewModel.rtspRequest.value!!, timeout = 2_000)
+                rtsp.start(requestVideo = true, requestAudio = false, autoPlayAudio = false)
             }
         }
 

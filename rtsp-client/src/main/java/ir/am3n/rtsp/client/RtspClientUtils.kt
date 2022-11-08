@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal object RtspClientUtils {
 
     private const val TAG = "RtspClientUtils"
+    private const val DEBUG = false
 
     private const val RTSP_CAPABILITY_NONE = 0
     private const val RTSP_CAPABILITY_OPTIONS = 1 shl 1
@@ -111,8 +112,9 @@ internal object RtspClientUtils {
                 data = ByteArray(header.payloadSize)
             }
 
-            //Log.d(TAG, "readRdpData() > readData()")
-            NetUtils.readData(inputStream, data, 0, header.payloadSize)
+            if (DEBUG) Log.d(TAG, "readRdpData() > readData()  header payload size ${header.payloadSize}")
+            val totalReadBytes = NetUtils.readData(inputStream, data, offset = 0, header.payloadSize)
+            if (DEBUG) Log.d(TAG, "readRdpData() > readData()  total read bytes: $totalReadBytes")
 
             // Check if keep-alive should be sent
             val l = System.currentTimeMillis()
@@ -120,8 +122,6 @@ internal object RtspClientUtils {
                 keepAliveSent = l
                 keepAliveListener.onRtspKeepAliveRequested()
             }
-
-            //Log.d(TAG, "readRdpData() > check track & payloadType")
 
             // Video
             if (header.payloadType == sdpInfo.videoTrack?.payloadType) {

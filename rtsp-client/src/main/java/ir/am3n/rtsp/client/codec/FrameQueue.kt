@@ -6,7 +6,10 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.TimeUnit
 
-class FrameQueue(frameQueueSize: Int) {
+class FrameQueue(
+    frameQueueSize: Int,
+    var timeout: Long = 5000
+) {
 
     companion object {
         private const val TAG: String = "FrameQueue"
@@ -30,7 +33,7 @@ class FrameQueue(frameQueueSize: Int) {
     @Throws(InterruptedException::class)
     fun pop(): Frame? {
         try {
-            val frame: Frame? = queue.poll(5000, TimeUnit.MILLISECONDS)
+            val frame: Frame? = queue.poll(timeout, TimeUnit.MILLISECONDS)
             if (frame == null) {
                 Log.w(TAG, "Cannot get frame, queue is empty")
             }

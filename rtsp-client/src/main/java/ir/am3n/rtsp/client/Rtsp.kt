@@ -92,7 +92,7 @@ class Rtsp {
             try {
                 if (DEBUG) Log.d(TAG, "Connecting to ${uri.host.toString()}:$port...")
 
-                val socket: Socket = NetUtils.createSocketAndConnect(uri, port, timeout = 5_000)
+                val socket: Socket = NetUtils.createSocketAndConnect(uri, port, timeout)
 
                 // Blocking call until stopped variable is true or connection failed
                 val rtspClient = RtspClient.Builder(socket, uri.toString(), rtspStopped, clientListener)
@@ -120,6 +120,7 @@ class Rtsp {
     private var username: String? = null
     private var password: String? = null
     private var userAgent: String? = null
+    private var timeout: Long = 5000
     private var requestVideo = true
     private var requestMediaImage = false
     private var requestYuvBytes = false
@@ -127,8 +128,8 @@ class Rtsp {
     private var requestAudio = true
     private var autoPlayAudio = true
     private var rtspThread: RtspThread? = null
-    private var videoQueue = FrameQueue(120)
-    private var audioQueue = FrameQueue(120)
+    private var videoQueue = FrameQueue(frameQueueSize = 120)
+    private var audioQueue = FrameQueue(frameQueueSize = 120)
     private var videoDecoder: VideoDecoder? = null
     private var audioDecoder: AudioDecoder? = null
 
@@ -246,7 +247,7 @@ class Rtsp {
 
     }
 
-    fun init(url: String, username: String? = null, password: String? = null, userAgent: String? = null) {
+    fun init(url: String, username: String? = null, password: String? = null, userAgent: String? = null, timeout: Long = 5000) {
         if (DEBUG) Log.v(TAG, "init(uri='$url', username=$username, password=$password, userAgent='$userAgent')")
         this.uri = Uri.parse(url)
         var urlUsername: String? = null
@@ -258,6 +259,9 @@ class Rtsp {
         this.username = username ?: urlUsername
         this.password = password ?: urlPassword
         this.userAgent = userAgent
+        this.timeout = timeout
+        this.videoQueue.timeout = timeout
+        this.audioQueue.timeout = timeout
     }
 
     fun start(requestVideo: Boolean = true, requestAudio: Boolean = true, autoPlayAudio: Boolean = true) {

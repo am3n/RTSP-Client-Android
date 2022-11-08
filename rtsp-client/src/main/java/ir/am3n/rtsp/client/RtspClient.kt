@@ -288,9 +288,9 @@ internal class RtspClient private constructor(builder: Builder) {
                     override fun onRtspKeepAliveRequested() {
                         try {
                             Log.d(TAG, "Sending keep-alive")
-                            if (hasCapability(RTSP_CAPABILITY_GET_PARAMETER, capabilities))
-                                sendGetParameterCommand(outputStream, uriRtsp, cSeq.addAndGet(1), userAgent, sessionFinal, authTokenFinal
-                            ) else {
+                            if (hasCapability(RTSP_CAPABILITY_GET_PARAMETER, capabilities)) {
+                                sendGetParameterCommand(outputStream, uriRtsp, cSeq.addAndGet(1), userAgent, sessionFinal, authTokenFinal)
+                            } else {
                                 sendOptionsCommand(outputStream, uriRtsp, cSeq.addAndGet(1), userAgent, authTokenFinal)
                             }
                             // Do not read response right now, since it may contain unread RTP frames.
