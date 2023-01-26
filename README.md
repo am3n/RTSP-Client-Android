@@ -51,11 +51,12 @@ dependencies {
 Then in code use:
 
 ```kotlin
+// ################# build rtsp ########################
 val url = "rtsps://10.0.1.3/test.sdp"
 val username = "admin"
 val password = "secret"
 val rtsp = Rtsp()
-rtsp.init(uri, username, password)
+rtsp.init(url, username, password)
 rtsp.setStatusListener(object : RtspStatusListener {
     override fun onConnecting() {}
     override fun onConnected(sdpInfo: SdpInfo) {}
@@ -63,6 +64,7 @@ rtsp.setStatusListener(object : RtspStatusListener {
     override fun onUnauthorized() {}
     override fun onFailed(message: String?) {}
 })
+// ###################################################
 rtsp.setSurfaceView(binding.svVideo)
 rtsp.start()
 // ...
