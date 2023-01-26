@@ -161,7 +161,7 @@ rtsp.setFrameListener(object : RtspFrameListener {
             // Just use it!
             /**
             binding.img.run {
-                post { setImageBitmap(bitmap?.removeTimestamp()) }
+                post { setImageBitmap(bitmap) }
             }
              */
         }
