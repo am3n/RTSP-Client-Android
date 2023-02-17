@@ -11,11 +11,11 @@ import ir.am3n.rtsp.client.data.VideoTrack
 import ir.am3n.rtsp.client.exceptions.UnauthorizedException
 import ir.am3n.rtsp.client.interfaces.RtspClientKeepAliveListener
 import ir.am3n.rtsp.client.interfaces.RtspClientListener
-import ir.am3n.rtsp.client.parser.AacParser
+import ir.am3n.rtsp.client.parser.AudioParser
 import ir.am3n.rtsp.client.parser.RtpParser
-import ir.am3n.rtsp.client.parser.VideoRtpParser
+import ir.am3n.rtsp.client.parser.VideoParser
 import ir.am3n.utils.NetUtils
-import ir.am3n.utils.VideoCodecUtils
+import ir.am3n.rtsp.client.codecs.H264
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -97,11 +97,19 @@ internal object RtspClientUtils {
         keepAliveListener: RtspClientKeepAliveListener
     ) {
         var data = ByteArray(0) // Usually not bigger than MTU = 15KB
-        val videoParser = if (sdpInfo.videoTrack != null) VideoRtpParser() else null
-        val audioParser = if (sdpInfo.audioTrack?.audioCodec == AUDIO_CODEC_AAC) AacParser(sdpInfo.audioTrack!!.mode!!) else null
+        val videoParser: VideoParser? =
+            if (sdpInfo.videoTrack != null) {
+                when (sdpInfo.videoTrack!!.videoCodec) {
+                    VIDEO_CODEC_H264 -> H264()
+                    VIDEO_CODEC_H265 -> H264()
+                    else -> null
+                }
+            } else null
+        val audioParser = if (sdpInfo.audioTrack?.audioCodec == AUDIO_CODEC_AAC) AudioParser(sdpInfo.audioTrack!!.mode!!) else null
         var nalUnitSps = if (sdpInfo.videoTrack != null) sdpInfo.videoTrack!!.sps else null
         var nalUnitPps = if (sdpInfo.videoTrack != null) sdpInfo.videoTrack!!.pps else null
         var keepAliveSent = System.currentTimeMillis()
+
         while (!exitFlag.get()) {
 
             //Log.d(TAG, "readRdpData() > readHeader()")
@@ -125,22 +133,24 @@ internal object RtspClientUtils {
 
             // Video
             if (header.payloadType == sdpInfo.videoTrack?.payloadType) {
-                val nalUnit = videoParser?.processRtpPacketAndGetNalUnit(data, header.payloadSize)
+                val nalUnit = videoParser?.processPacketAndGetNalUnit(data, header.payloadSize)
                 if (nalUnit != null) {
-                    when (VideoCodecUtils.getH264NalUnitType(nalUnit, 0, nalUnit.size)) {
-                        VideoCodecUtils.NAL_SPS -> {
+                    when (videoParser.getNalUnitType(nalUnit, 0, nalUnit.size)) {
+                        videoParser.NAL_SPS -> {
                             nalUnitSps = nalUnit
                             // Looks like there is NAL_IDR_SLICE as well. Send it now.
-                            if (nalUnit.size > 100)
+                            if (nalUnit.size > 100) {
                                 listener.onRtspVideoNalUnitReceived(nalUnit, 0, nalUnit.size, (header.timeStamp * 11.111111).toLong())
+                            }
                         }
-                        VideoCodecUtils.NAL_PPS -> {
+                        videoParser.NAL_PPS -> {
                             nalUnitPps = nalUnit
                             // Looks like there is NAL_IDR_SLICE as well. Send it now.
-                            if (nalUnit.size > 100)
+                            if (nalUnit.size > 100) {
                                 listener.onRtspVideoNalUnitReceived(nalUnit, 0, nalUnit.size, (header.timeStamp * 11.111111).toLong())
+                            }
                         }
-                        VideoCodecUtils.NAL_IDR_SLICE -> {
+                        videoParser.NAL_IDR_SLICE -> {
                             // Combine IDR with SPS/PPS
                             if (nalUnitSps != null && nalUnitPps != null) {
                                 val nalUnitSppPps = ByteArray(nalUnitSps.size + nalUnitPps.size)
@@ -158,8 +168,9 @@ internal object RtspClientUtils {
                             }
                             listener.onRtspVideoNalUnitReceived(nalUnit, offset = 0, nalUnit.size, (header.timeStamp * 11.111111).toLong())
                         }
-                        else ->
+                        else -> {
                             listener.onRtspVideoNalUnitReceived(nalUnit, offset = 0, length = nalUnit.size, timestamp = (header.timeStamp * 11.111111).toLong())
+                        }
                     }
                 }
 

@@ -1,4 +1,4 @@
-package ir.am3n.rtsp.client.codec
+package ir.am3n.rtsp.client.decoders
 
 import android.media.*
 import android.util.Log

@@ -1,4 +1,4 @@
-package ir.am3n.rtsp.client.codec
+package ir.am3n.rtsp.client.decoders
 
 import android.util.Log
 import ir.am3n.rtsp.client.data.Frame

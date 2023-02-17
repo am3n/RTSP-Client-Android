@@ -5,7 +5,7 @@ import com.google.android.exoplayer2.util.ParsableBitArray
 import com.google.android.exoplayer2.util.ParsableByteArray
 
 // https://tools.ietf.org/html/rfc3640
-class AacParser(aacMode: String) {
+class AudioParser(aacMode: String) {
 
     companion object {
 

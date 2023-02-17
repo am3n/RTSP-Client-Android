@@ -9,9 +9,9 @@ import android.os.Process.*
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import ir.am3n.rtsp.client.codec.AudioDecoder
-import ir.am3n.rtsp.client.codec.FrameQueue
-import ir.am3n.rtsp.client.codec.VideoDecoder
+import ir.am3n.rtsp.client.decoders.AudioDecoder
+import ir.am3n.rtsp.client.decoders.FrameQueue
+import ir.am3n.rtsp.client.decoders.VideoDecoder
 import ir.am3n.rtsp.client.data.Frame
 import ir.am3n.rtsp.client.data.SdpInfo
 import ir.am3n.rtsp.client.interfaces.RtspClientListener

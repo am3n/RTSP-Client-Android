@@ -187,7 +187,7 @@ class LiveFragment : Fragment() {
             if (rtsp.isStarted()) {
                 rtsp.stop()
             } else {
-                rtsp.init(liveViewModel.rtspRequest.value!!, timeout = 2_000)
+                rtsp.init(liveViewModel.rtspRequest.value!!, username = "admin", password = "8888", timeout = 2_000)
                 rtsp.start(requestVideo = true, requestAudio = false, autoPlayAudio = false)
             }
         }
