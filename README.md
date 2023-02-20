@@ -73,14 +73,14 @@ rtsp.stop()
 
 ---
 
-### 2) You can still use library without any decoding (just for obtaining raw H264/H265 frames) 
+### 2) You can still use library without any decoding (just for obtaining raw H264 frames) 
 e.g. for writing video stream into MP4 via muxer.
 
 ```kotlin
 // ... build rtsp
 rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {
-        // Send raw H264/H265 NAL unit to decoder
+        // Send raw H264 NAL unit to decoder
     }
     override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {}
     override fun onAudioSampleReceived(frame: Frame?) {
@@ -94,7 +94,7 @@ rtsp.stop()
 
 ---
 
-### 3) You can still use library with H264/H265 to YUV MediaImage decoding
+### 3) You can still use library with H264 to YUV MediaImage decoding
 
 ```kotlin
 // ... build rtsp
@@ -122,7 +122,7 @@ rtsp.stop()
 
 ---
 
-### 4) You can still use library with H264/H265 to YUV ByteArray decoding
+### 4) You can still use library with H264 to YUV ByteArray decoding
 
 ```kotlin
 // ... build rtsp
@@ -150,7 +150,7 @@ rtsp.stop()
 ---
 
 
-### 5) You can still use library with H264/H265 to Bitmap decoding
+### 5) You can still use library with H264 to Bitmap decoding
 
 ```kotlin
 // ... build rtsp
