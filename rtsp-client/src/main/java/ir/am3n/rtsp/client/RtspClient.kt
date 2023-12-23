@@ -261,11 +261,13 @@ internal class RtspClient private constructor(builder: Builder) {
             }
 
 
-            if (TextUtils.isEmpty(session))
+            if (TextUtils.isEmpty(session)) {
                 throw IOException("Failed to get any media track")
+            }
             checkExitFlag(exitFlag)
-            if (digestRealmNonce != null)
+            if (digestRealmNonce != null) {
                 authToken = getDigestAuthHeader(username, password, "PLAY", uriRtsp, digestRealmNonce.first, digestRealmNonce.second)
+            }
             sendPlayCommand(outputStream, uriRtsp, cSeq.addAndGet(1), userAgent, authToken, session!!)
             status = readResponseStatusCode(inputStream)
             Log.i(TAG, "PLAY status: $status")
@@ -309,8 +311,16 @@ internal class RtspClient private constructor(builder: Builder) {
                 } finally {
                     // Cleanup resources on server side
                     if (hasCapability(RTSP_CAPABILITY_TEARDOWN, capabilities)) {
-                        if (digestRealmNonce != null)
-                            authToken = getDigestAuthHeader(username, password, "TEARDOWN", uriRtsp, digestRealmNonce.first, digestRealmNonce.second)
+                        if (digestRealmNonce != null) {
+                            authToken = getDigestAuthHeader(
+                                username,
+                                password,
+                                "TEARDOWN",
+                                uriRtsp,
+                                digestRealmNonce.first,
+                                digestRealmNonce.second
+                            )
+                        }
                         sendTeardownCommand(outputStream, uriRtsp, cSeq.addAndGet(1), userAgent, authToken, sessionFinal)
                     }
                 }

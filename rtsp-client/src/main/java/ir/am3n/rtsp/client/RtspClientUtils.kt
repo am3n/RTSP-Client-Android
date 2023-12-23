@@ -177,8 +177,9 @@ internal object RtspClientUtils {
                 // Audio
             } else if (header.payloadType == sdpInfo.audioTrack?.payloadType) {
                 val sample = audioParser?.processRtpPacketAndGetSample(data, header.payloadSize)
-                if (sample != null)
+                if (sample != null) {
                     listener.onRtspAudioSampleReceived(sample, offset = 0, sample.size, (header.timeStamp * 11.111111).toLong())
+                }
 
                 // Unknown
             } else {
@@ -243,9 +244,13 @@ internal object RtspClientUtils {
         Log.v(TAG, "sendDescribeCommand(request=\"$request\", cSeq=$cSeq)")
         outputStream.write(("DESCRIBE $request RTSP/1.0$CRLF").toByteArray())
         outputStream.write(("Accept: application/sdp$CRLF").toByteArray())
-        if (authToken != null) outputStream.write(("Authorization: $authToken$CRLF").toByteArray())
+        if (authToken != null) {
+            outputStream.write(("Authorization: $authToken$CRLF").toByteArray())
+        }
         outputStream.write(("CSeq: $cSeq$CRLF").toByteArray())
-        if (userAgent != null) outputStream.write(("User-Agent: $userAgent$CRLF").toByteArray())
+        if (userAgent != null) {
+            outputStream.write(("User-Agent: $userAgent$CRLF").toByteArray())
+        }
         outputStream.write(CRLF.toByteArray())
         outputStream.flush()
     }
