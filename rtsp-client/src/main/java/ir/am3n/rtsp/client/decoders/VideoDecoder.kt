@@ -9,6 +9,7 @@ import android.util.Log
 import android.view.SurfaceView
 import com.google.android.renderscript.Toolkit
 import com.google.android.renderscript.YuvFormat
+import ir.am3n.rtsp.client.Rtsp
 import ir.am3n.rtsp.client.interfaces.RtspClientListener
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
@@ -27,7 +28,6 @@ internal class VideoDecoder(
 
     companion object {
         private const val TAG: String = "VideoDecoder"
-        private const val DEBUG = true
     }
 
     private val rect = Rect()
@@ -50,26 +50,26 @@ internal class VideoDecoder(
     }
 
     fun stopAsync() {
-        if (DEBUG) Log.v(TAG, "stopAsync()")
+        if (Rtsp.DEBUG) Log.v(TAG, "stopAsync()")
         exitFlag.set(true)
         // Wake up sleep() code
         interrupt()
     }
 
     override fun run() {
-        if (DEBUG) Log.d(TAG, "$name started")
+        if (Rtsp.DEBUG) Log.d(TAG, "$name started")
 
         try {
             val decoder = MediaCodec.createDecoderByType(mimeType)
             val widthHeight = getDecoderSafeWidthHeight(decoder)
             val format = MediaFormat.createVideoFormat(mimeType, widthHeight.first, widthHeight.second)
 
-            if (DEBUG) Log.d(TAG, "Configuring surface ${widthHeight.first}x${widthHeight.second} w/ '$mimeType'")
+            if (Rtsp.DEBUG) Log.d(TAG, "Configuring surface ${widthHeight.first}x${widthHeight.second} w/ '$mimeType'")
 
             decoder.configure(format, null, null, 0)
 
             decoder.start()
-            if (DEBUG) Log.d(TAG, "Started surface decoder")
+            if (Rtsp.DEBUG) Log.d(TAG, "Started surface decoder")
 
             val bufferInfo = MediaCodec.BufferInfo()
 
@@ -84,7 +84,7 @@ internal class VideoDecoder(
 
                     val frame = queue.pop()
                     if (frame == null) {
-                        if (DEBUG) Log.d(TAG, "Empty video frame")
+                        if (Rtsp.DEBUG) Log.d(TAG, "Empty video frame")
                         decoder.queueInputBuffer(inIndex, 0, 0, 0L, 0)
                     } else {
                         byteBuffer?.put(frame.data, frame.offset, frame.length)
@@ -97,7 +97,7 @@ internal class VideoDecoder(
 
                 when (val outIndex = decoder.dequeueOutputBuffer(bufferInfo, 5_000)) {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                        if (DEBUG) Log.d(TAG, "Decoder format changed: ${decoder.outputFormat}")
+                        if (Rtsp.DEBUG) Log.d(TAG, "Decoder format changed: ${decoder.outputFormat}")
                         decoder.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
                     }
                     else -> {
@@ -110,7 +110,7 @@ internal class VideoDecoder(
 
                 // All decoded frames have been rendered, we can stop playing now
                 if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
-                    if (DEBUG) Log.d(TAG, "OutputBuffer BUFFER_FLAG_END_OF_STREAM")
+                    if (Rtsp.DEBUG) Log.d(TAG, "OutputBuffer BUFFER_FLAG_END_OF_STREAM")
                     break
                 }
 
@@ -121,7 +121,7 @@ internal class VideoDecoder(
             if (inIndex >= 0) {
                 decoder.queueInputBuffer(inIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
             } else {
-                if (DEBUG) Log.w(TAG, "Not able to signal end of stream")
+                if (Rtsp.DEBUG) Log.w(TAG, "Not able to signal end of stream")
             }
 
             decoder.stop()
@@ -129,18 +129,18 @@ internal class VideoDecoder(
             queue.clear()
 
         } catch (e: Exception) {
-            if (DEBUG) Log.e(TAG, "$name stopped due to '${e.message}'")
+            if (Rtsp.DEBUG) Log.e(TAG, "$name stopped due to '${e.message}'")
             // While configuring stopAsync can be called and surface released. Just exit.
             if (!exitFlag.get())
                 e.printStackTrace()
             return
         }
 
-        if (DEBUG) Log.d(TAG, "$name stopped")
+        if (Rtsp.DEBUG) Log.d(TAG, "$name stopped")
     }
 
     private fun fixSurfaceSize() {
-        if (DEBUG) Log.d(TAG, "fixSurfaceSize()  width: $width   height: $height   " +
+        if (Rtsp.DEBUG) Log.d(TAG, "fixSurfaceSize()  width: $width   height: $height   " +
                 "sw: ${surfaceView?.measuredWidth}  sh: ${surfaceView?.measuredHeight}")
         surfaceView?.post {
             if (width > height) {
@@ -149,14 +149,14 @@ internal class VideoDecoder(
                 surfaceView?.holder?.setFixedSize(surfaceView!!.measuredWidth, height)
                 rect.right = surfaceView!!.measuredWidth
                 rect.bottom = height
-                if (DEBUG) Log.d(TAG, "fixSurfaceSize()   set  width: ${surfaceView!!.measuredWidth}   height: $height")
+                if (Rtsp.DEBUG) Log.d(TAG, "fixSurfaceSize()   set  width: ${surfaceView!!.measuredWidth}   height: $height")
             } else {
                 val rate = (surfaceView?.measuredHeight ?: 0).toFloat() / height.toFloat()
                 val width = (width * rate).toInt()
                 surfaceView?.holder?.setFixedSize(width, surfaceView!!.measuredHeight)
                 rect.right = width
                 rect.bottom = surfaceView!!.measuredHeight
-                if (DEBUG) Log.d(TAG, "fixSurfaceSize()   set  width: $width   height: ${surfaceView!!.measuredHeight}")
+                if (Rtsp.DEBUG) Log.d(TAG, "fixSurfaceSize()   set  width: $width   height: ${surfaceView!!.measuredHeight}")
             }
         }
     }
@@ -209,14 +209,14 @@ internal class VideoDecoder(
 
             /*val time = System.currentTimeMillis() - timestamp
             val decodeTime = System.currentTimeMillis() - t
-            if (DEBUG) Log.d(TAG, "time: $time      decode time: $decodeTime")
+            if (Rtsp.DEBUG) Log.d(TAG, "time: $time      decode time: $decodeTime")
             timestamp = System.currentTimeMillis()
 
             sum += time
             decodeSum += decodeTime
             count++
             if (count % 500 == 0) {
-                if (DEBUG) Log.d(TAG, "avg: ${sum / count}      decode avg: ${(decodeSum / count).toInt()}")
+                if (Rtsp.DEBUG) Log.d(TAG, "avg: ${sum / count}      decode avg: ${(decodeSum / count).toInt()}")
                 sum = 0
                 decodeSum = 0
                 count = 0

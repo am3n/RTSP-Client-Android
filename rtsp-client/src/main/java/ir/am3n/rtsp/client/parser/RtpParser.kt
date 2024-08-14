@@ -1,6 +1,7 @@
 package ir.am3n.rtsp.client.parser
 
 import android.util.Log
+import ir.am3n.rtsp.client.Rtsp
 import ir.am3n.utils.NetUtils.readData
 import kotlin.Throws
 import ir.am3n.rtsp.client.data.RtpHeader
@@ -10,7 +11,6 @@ import java.io.InputStream
 internal object RtpParser {
 
     private const val TAG = "RtpParser"
-    private const val DEBUG = false
 
     const val RTP_HEADER_SIZE = 12
 
@@ -22,9 +22,9 @@ internal object RtpParser {
         val header = ByteArray(RTP_HEADER_SIZE)
         // Skip 4 bytes (TCP only). No those bytes in UDP.
         readData(inputStream, header, 0, 4)
-        if (DEBUG) Log.d(TAG, if (header[1].toInt() == 0) "RTP packet" else "RTCP packet")
+        if (Rtsp.DEBUG) Log.d(TAG, if (header[1].toInt() == 0) "RTP packet" else "RTCP packet")
         var packetSize = RtpHeader.getPacketSize(header)
-        if (DEBUG) Log.d(TAG, "Packet size: $packetSize")
+        if (Rtsp.DEBUG) Log.d(TAG, "Packet size: $packetSize")
         if (readData(inputStream, header, 0, header.size) == header.size) {
             val rtpHeader = RtpHeader.parseData(header, packetSize)
             if (rtpHeader == null) {

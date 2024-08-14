@@ -27,7 +27,6 @@ class LiveFragment : Fragment() {
 
     companion object {
         private const val TAG: String = "LiveFragment"
-        private const val DEBUG = true
     }
 
     private lateinit var binding: FragmentLiveBinding
@@ -60,7 +59,7 @@ class LiveFragment : Fragment() {
         }
 
         override fun onDisconnected() {
-            if (DEBUG) Log.d(TAG, "onDisconnected()")
+            if (Rtsp.DEBUG) Log.d(TAG, "onDisconnected()")
             disconnectCount++
             binding.tvFrameRate.text = ""
             binding.tvStatus.text = "RTSP disconnected"
@@ -154,7 +153,7 @@ class LiveFragment : Fragment() {
 
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        if (DEBUG) Log.v(TAG, "onCreateView()")
+        if (Rtsp.DEBUG) Log.v(TAG, "onCreateView()")
 
         liveViewModel = ViewModelProvider(this)[LiveViewModel::class.java]
         binding = FragmentLiveBinding.inflate(inflater, container, false)
@@ -204,13 +203,13 @@ class LiveFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        if (DEBUG) Log.v(TAG, "onResume()")
+        if (Rtsp.DEBUG) Log.v(TAG, "onResume()")
         liveViewModel.loadParams(requireContext())
     }
 
     override fun onPause() {
         super.onPause()
-        if (DEBUG) Log.v(TAG, "onPause()")
+        if (Rtsp.DEBUG) Log.v(TAG, "onPause()")
         liveViewModel.saveParams(requireContext())
     }
 

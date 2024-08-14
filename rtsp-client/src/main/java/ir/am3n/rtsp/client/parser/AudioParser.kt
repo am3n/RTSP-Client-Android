@@ -3,6 +3,7 @@ package ir.am3n.rtsp.client.parser
 import android.util.Log
 import com.google.android.exoplayer2.util.ParsableBitArray
 import com.google.android.exoplayer2.util.ParsableByteArray
+import ir.am3n.rtsp.client.Rtsp
 
 // https://tools.ietf.org/html/rfc3640
 class AudioParser(aacMode: String) {
@@ -10,7 +11,6 @@ class AudioParser(aacMode: String) {
     companion object {
 
         private const val TAG = "AacParser"
-        private const val DEBUG = false
         private const val MODE_LBR = 0
         private const val MODE_HBR = 1
 
@@ -37,7 +37,7 @@ class AudioParser(aacMode: String) {
     }
 
     fun processRtpPacketAndGetSample(data: ByteArray, length: Int): ByteArray {
-        if (DEBUG) Log.v(TAG, "processRtpPacketAndGetSample(length=$length)")
+        if (Rtsp.DEBUG) Log.v(TAG, "processRtpPacketAndGetSample(length=$length)")
         var auHeadersCount = 1
         val numBitsAuSize = NUM_BITS_AU_SIZES[_aacMode]
         val numBitsAuIndex = NUM_BITS_AU_INDEX[_aacMode]

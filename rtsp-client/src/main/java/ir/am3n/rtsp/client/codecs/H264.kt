@@ -1,6 +1,7 @@
 package ir.am3n.rtsp.client.codecs
 
 import android.util.Log
+import ir.am3n.rtsp.client.Rtsp
 import ir.am3n.rtsp.client.parser.VideoParser
 import ir.am3n.utils.ByteUtils
 import java.util.ArrayList
@@ -12,7 +13,6 @@ class H264 : VideoParser() {
     companion object {
 
         private const val TAG = "H264"
-        private const val DEBUG = true
 
         private const val NAL_SLICE: Byte = 1
         private const val NAL_DPA: Byte = 2
@@ -49,11 +49,11 @@ class H264 : VideoParser() {
     override val NAL_IDR_SLICE: Byte = 5
 
     override fun processPacketAndGetNalUnit(data: ByteArray, length: Int): ByteArray? {
-        if (DEBUG) Log.v(TAG, "processRtpPacketAndGetNalUnit(length=$length)")
+        if (Rtsp.DEBUG) Log.v(TAG, "processRtpPacketAndGetNalUnit(length=$length)")
         var tmpLen: Int
         val nalType: Byte = data[0] and 0x1F
         val packFlag: Int = data[1].toInt() and 0xC0
-        if (DEBUG) Log.d(TAG, "NAL type: $nalType, pack flag: $packFlag")
+        if (Rtsp.DEBUG) Log.d(TAG, "NAL type: $nalType, pack flag: $packFlag")
         when (nalType) {
             NAL_FU_A -> {
                 when (packFlag) {
@@ -94,7 +94,7 @@ class H264 : VideoParser() {
             }
             NAL_FU_B -> {}
             else -> {
-                if (DEBUG) Log.d(TAG, "Single NAL")
+                if (Rtsp.DEBUG) Log.d(TAG, "Single NAL")
                 _nalUnit = ByteArray(4 + length)
                 _nalUnit[0] = 0x00
                 _nalUnit[1] = 0x00

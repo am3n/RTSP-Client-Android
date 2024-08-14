@@ -1,6 +1,7 @@
 package ir.am3n.rtsp.client.decoders
 
 import android.util.Log
+import ir.am3n.rtsp.client.Rtsp
 import ir.am3n.rtsp.client.data.Frame
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.BlockingQueue
@@ -20,13 +21,13 @@ class FrameQueue(
     @Throws(InterruptedException::class)
     fun push(frame: Frame): Boolean {
         if (queue.remainingCapacity() <= 0) {
-            Log.w(TAG, "Queue is full, clearing it..")
+            if (Rtsp.DEBUG) Log.w(TAG, "Queue is full, clearing it..")
             queue.clear()
         }
         if (queue.offer(frame, 5, TimeUnit.MILLISECONDS)) {
             return true
         }
-        Log.w(TAG, "Cannot add frame, queue is full")
+        if (Rtsp.DEBUG) Log.w(TAG, "Cannot add frame, queue is full")
         return false
     }
 
@@ -35,11 +36,11 @@ class FrameQueue(
         try {
             val frame: Frame? = queue.poll(timeout, TimeUnit.MILLISECONDS)
             if (frame == null) {
-                Log.w(TAG, "Cannot get frame, queue is empty")
+                if (Rtsp.DEBUG) Log.w(TAG, "Cannot get frame, queue is empty")
             }
             return frame
         } catch (e: InterruptedException) {
-            Log.w(TAG, "Cannot get frame", e)
+            if (Rtsp.DEBUG) Log.w(TAG, "Cannot get frame", e)
             Thread.currentThread().interrupt()
         }
         return null

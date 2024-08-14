@@ -121,7 +121,7 @@ internal class RtspClient private constructor(builder: Builder) {
     }
 
     fun execute() {
-        Log.v(TAG, "execute()")
+        if (Rtsp.DEBUG) Log.v(TAG, "execute()")
         try {
 
             val inputStream = rtspSocket.getInputStream()
@@ -158,7 +158,7 @@ internal class RtspClient private constructor(builder: Builder) {
                 headers = readResponseHeaders(inputStream)
                 dumpHeaders(headers)
             }
-            Log.i(TAG, "OPTIONS status: $status")
+            if (Rtsp.DEBUG) Log.i(TAG, "OPTIONS status: $status")
             checkStatusCode(status)
 
             val capabilities = getSupportedCapabilities(headers)
@@ -188,13 +188,13 @@ internal class RtspClient private constructor(builder: Builder) {
                 headers = readResponseHeaders(inputStream)
                 dumpHeaders(headers)
             }
-            Log.i(TAG, "DESCRIBE status: $status")
+            if (Rtsp.DEBUG) Log.i(TAG, "DESCRIBE status: $status")
             checkStatusCode(status)
 
             val contentLength = getHeaderContentLength(headers)
             if (contentLength > 0) {
                 val content = readContentAsText(inputStream, contentLength)
-                Log.i(TAG, "" + content)
+                if (Rtsp.DEBUG) Log.i(TAG, "" + content)
                 try {
                     val params = getDescribeParams(content)
                     sdpInfo = getSdpInfoFromDescribeParams(params)
@@ -204,7 +204,7 @@ internal class RtspClient private constructor(builder: Builder) {
                         sdpInfo.audioTrack = null
                     // Only AAC supported
                     if (sdpInfo.audioTrack != null && sdpInfo.audioTrack?.audioCodec != AUDIO_CODEC_AAC) {
-                        Log.e(TAG, "Unknown RTSP audio codec (" + sdpInfo.audioTrack?.audioCodec + ") specified in SDP")
+                        if (Rtsp.DEBUG) Log.e(TAG, "Unknown RTSP audio codec (" + sdpInfo.audioTrack?.audioCodec + ") specified in SDP")
                         sdpInfo.audioTrack = null
                     }
                 } catch (e: Exception) {
@@ -233,7 +233,7 @@ internal class RtspClient private constructor(builder: Builder) {
                     sendSetupCommand(outputStream, uriRtspSetup, cSeq.addAndGet(1), userAgent,
                         authToken, session, interleaved = if (i == 0) "0-1" /*video*/ else "2-3" /*audio*/)
                     status = readResponseStatusCode(inputStream)
-                    Log.i(TAG, "SETUP status: $status")
+                    if (Rtsp.DEBUG) Log.i(TAG, "SETUP status: $status")
                     checkStatusCode(status)
                     headers = readResponseHeaders(inputStream)
                     dumpHeaders(headers)
@@ -248,12 +248,12 @@ internal class RtspClient private constructor(builder: Builder) {
                                 try {
                                     sessionTimeout = params[1].toInt()
                                 } catch (e: NumberFormatException) {
-                                    Log.e(TAG, "Failed to parse RTSP session timeout")
+                                    if (Rtsp.DEBUG) Log.e(TAG, "Failed to parse RTSP session timeout")
                                 }
                             }
                         }
                     }
-                    Log.d(TAG, "SETUP session: $session, timeout: $sessionTimeout")
+                    if (Rtsp.DEBUG) Log.d(TAG, "SETUP session: $session, timeout: $sessionTimeout")
                     if (TextUtils.isEmpty(session))
                         throw IOException("Failed to get RTSP session")
                 }
@@ -270,7 +270,7 @@ internal class RtspClient private constructor(builder: Builder) {
             }
             sendPlayCommand(outputStream, uriRtsp, cSeq.addAndGet(1), userAgent, authToken, session!!)
             status = readResponseStatusCode(inputStream)
-            Log.i(TAG, "PLAY status: $status")
+            if (Rtsp.DEBUG) Log.i(TAG, "PLAY status: $status")
             checkStatusCode(status)
             headers = readResponseHeaders(inputStream)
             dumpHeaders(headers)
@@ -289,7 +289,7 @@ internal class RtspClient private constructor(builder: Builder) {
                 val keepAliveListener = object : RtspClientKeepAliveListener {
                     override fun onRtspKeepAliveRequested() {
                         try {
-                            Log.d(TAG, "Sending keep-alive")
+                            if (Rtsp.DEBUG) Log.d(TAG, "Sending keep-alive")
                             if (hasCapability(RTSP_CAPABILITY_GET_PARAMETER, capabilities)) {
                                 sendGetParameterCommand(outputStream, uriRtsp, cSeq.addAndGet(1), userAgent, sessionFinal, authTokenFinal)
                             } else {
@@ -354,19 +354,19 @@ internal class RtspClient private constructor(builder: Builder) {
         val rtspHeader = "RTSP/1.0 ".toByteArray()
         // Search fpr "RTSP/1.0 "
         while (!exitFlag.get() && readUntilBytesFound(inputStream, rtspHeader) && readLine(inputStream).also { line = it } != null) {
-            Log.d(TAG, "" + line)
+            if (Rtsp.DEBUG) Log.d(TAG, "" + line)
             val indexCode = line!!.indexOf(' ')
             val code = line!!.substring(0, indexCode)
             try {
                 val statusCode = code.toInt()
-                Log.d(TAG, "Status code: $statusCode")
+                if (Rtsp.DEBUG) Log.d(TAG, "Status code: $statusCode")
                 return statusCode
             } catch (e: NumberFormatException) {
                 // Does not fulfill standard "RTSP/1.1 200 OK" token
                 // Continue search for
             }
         }
-        Log.w(TAG, "Could not obtain status code")
+        if (Rtsp.DEBUG) Log.w(TAG, "Could not obtain status code")
         return -1
     }
 
@@ -375,7 +375,7 @@ internal class RtspClient private constructor(builder: Builder) {
         val headers = ArrayList<Pair<String, String>>()
         var line = ""
         while (!exitFlag.get() && !TextUtils.isEmpty(readLine(inputStream).also { line = it ?: "" })) {
-            Log.d(TAG, "" + line)
+            if (Rtsp.DEBUG) Log.d(TAG, "" + line)
             if (CRLF == line) {
                 return headers
             } else {

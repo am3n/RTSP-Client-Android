@@ -12,7 +12,7 @@ internal class LoggerOutputStream(out: OutputStream) : BufferedOutputStream(out)
     @Throws(IOException::class)
     @Synchronized
     override fun write(b: ByteArray, off: Int, len: Int) {
-        Log.i(RtspClient.TAG + " Out", String(b, off, len))
+        if (Rtsp.DEBUG) Log.i(RtspClient.TAG + " Out", String(b, off, len))
         super.write(b, off, len)
     }
 

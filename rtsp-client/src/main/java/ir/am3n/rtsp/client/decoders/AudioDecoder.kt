@@ -2,6 +2,7 @@ package ir.am3n.rtsp.client.decoders
 
 import android.media.*
 import android.util.Log
+import ir.am3n.rtsp.client.Rtsp
 import ir.am3n.rtsp.client.data.Frame
 import java.nio.ByteBuffer
 
@@ -16,7 +17,6 @@ class AudioDecoder(
     companion object {
 
         private const val TAG: String = "AudioDecoder"
-        private const val DEBUG = false
 
         fun getAacDecoderConfigData(audioProfile: Int, sampleRate: Int, channels: Int): ByteArray {
             // AOT_LC = 2
@@ -55,14 +55,14 @@ class AudioDecoder(
     }
 
     fun stopAsync() {
-        if (DEBUG) Log.v(TAG, "stopAsync()")
+        if (Rtsp.DEBUG) Log.v(TAG, "stopAsync()")
         isRunning = false
         // Wake up sleep() code
         interrupt()
     }
 
     override fun run() {
-        if (DEBUG) Log.d(TAG, "$name started")
+        if (Rtsp.DEBUG) Log.d(TAG, "$name started")
 
         // Creating audio decoder
         val decoder = MediaCodec.createDecoderByType(mimeType)
@@ -138,7 +138,7 @@ class AudioDecoder(
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED ->
                         Log.d(TAG, "Decoder format changed: ${decoder.outputFormat}")
                     MediaCodec.INFO_TRY_AGAIN_LATER ->
-                        if (DEBUG) Log.d(TAG, "No output from decoder available")
+                        if (Rtsp.DEBUG) Log.d(TAG, "No output from decoder available")
                     else -> {
                         if (outIndex >= 0) {
                             val byteBuffer: ByteBuffer? = decoder.getOutputBuffer(outIndex)
@@ -178,7 +178,7 @@ class AudioDecoder(
 
         audioFrameQueue.clear()
 
-        if (DEBUG) Log.d(TAG, "$name stopped")
+        if (Rtsp.DEBUG) Log.d(TAG, "$name stopped")
 
     }
 

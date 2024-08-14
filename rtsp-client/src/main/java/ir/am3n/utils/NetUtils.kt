@@ -3,6 +3,7 @@ package ir.am3n.utils
 import android.annotation.SuppressLint
 import android.net.Uri
 import android.util.Log
+import ir.am3n.rtsp.client.Rtsp
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStream
@@ -24,7 +25,7 @@ object NetUtils {
 
     @Throws(Exception::class)
     fun createSocketAndConnect(dstUri: Uri, dstPort: Int, timeout: Long): Socket {
-        Log.v(TAG, "createSocketAndConnect(dstUri=$dstUri, dstPort=$dstPort, timeout=$timeout)")
+        if (Rtsp.DEBUG) Log.v(TAG, "createSocketAndConnect(dstUri=$dstUri, dstPort=$dstPort, timeout=$timeout)")
         return if (dstUri.scheme!!.lowercase().equals("rtsps", ignoreCase = true))
             createSslSocketAndConnect(dstUri.host!!, dstPort, timeout)
         else
@@ -33,7 +34,7 @@ object NetUtils {
 
     @Throws(Exception::class)
     fun createSslSocketAndConnect(dstName: String, dstPort: Int, timeout: Long): SSLSocket {
-        Log.v(TAG, "createSslSocketAndConnect(dstName=$dstName, dstPort=$dstPort, timeout=$timeout)")
+        if (Rtsp.DEBUG) Log.v(TAG, "createSslSocketAndConnect(dstName=$dstName, dstPort=$dstPort, timeout=$timeout)")
 
 //        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
 //        trustManagerFactory.init((KeyStore) null);
@@ -53,7 +54,7 @@ object NetUtils {
 
     @Throws(IOException::class)
     fun createSocketAndConnect(dstName: String, dstPort: Int, timeout: Long): Socket {
-        Log.v(TAG, "createSocketAndConnect(dstName=$dstName, dstPort=$dstPort, timeout=$timeout)")
+        if (Rtsp.DEBUG) Log.v(TAG, "createSocketAndConnect(dstName=$dstName, dstPort=$dstPort, timeout=$timeout)")
         val socket = Socket()
         socket.connect(InetSocketAddress(dstName, dstPort), timeout.toInt())
         socket.setSoLinger(false, 1)
@@ -71,7 +72,7 @@ object NetUtils {
 
     @Throws(IOException::class)
     fun closeSocket(socket: Socket?) {
-        Log.v(TAG, "closeSocket()")
+        if (Rtsp.DEBUG) Log.v(TAG, "closeSocket()")
         if (socket != null) {
             try {
                 socket.shutdownInput()

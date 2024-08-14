@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal object RtspClientUtils {
 
     private const val TAG = "RtspClientUtils"
-    private const val DEBUG = false
 
     private const val RTSP_CAPABILITY_NONE = 0
     private const val RTSP_CAPABILITY_OPTIONS = 1 shl 1
@@ -112,7 +111,7 @@ internal object RtspClientUtils {
 
         while (!exitFlag.get()) {
 
-            //Log.d(TAG, "readRdpData() > readHeader()")
+            //if (Rtsp.DEBUG) Log.d(TAG, "readRdpData() > readHeader()")
             val header = RtpParser.readHeader(inputStream)
                 ?: throw IOException("No RTP frame header found")
 
@@ -120,9 +119,9 @@ internal object RtspClientUtils {
                 data = ByteArray(header.payloadSize)
             }
 
-            if (DEBUG) Log.d(TAG, "readRdpData() > readData()  header payload size ${header.payloadSize}")
+            if (Rtsp.DEBUG) Log.d(TAG, "readRdpData() > readData()  header payload size ${header.payloadSize}")
             val totalReadBytes = NetUtils.readData(inputStream, data, offset = 0, header.payloadSize)
-            if (DEBUG) Log.d(TAG, "readRdpData() > readData()  total read bytes: $totalReadBytes")
+            if (Rtsp.DEBUG) Log.d(TAG, "readRdpData() > readData()  total read bytes: $totalReadBytes")
 
             // Check if keep-alive should be sent
             val l = System.currentTimeMillis()
@@ -184,7 +183,7 @@ internal object RtspClientUtils {
                 // Unknown
             } else {
                 // https://www.iana.org/assignments/rtp-parameters/rtp-parameters.xhtml
-                Log.w(TAG, "Invalid RTP payload type " + header.payloadType)
+                if (Rtsp.DEBUG) Log.w(TAG, "Invalid RTP payload type " + header.payloadType)
             }
         }
     }
@@ -216,7 +215,7 @@ internal object RtspClientUtils {
         userAgent: String?,
         authToken: String?
     ) {
-        Log.v(TAG, "sendOptionsCommand(request=\"$request\", cSeq=$cSeq)")
+        if (Rtsp.DEBUG) Log.v(TAG, "sendOptionsCommand(request=\"$request\", cSeq=$cSeq)")
         sendSimpleCommand("OPTIONS", outputStream, request, cSeq, userAgent, null, authToken)
     }
 
@@ -229,7 +228,7 @@ internal object RtspClientUtils {
         session: String?,
         authToken: String?
     ) {
-        Log.v(TAG, "sendGetParameterCommand(request=\"$request\", cSeq=$cSeq)")
+        if (Rtsp.DEBUG) Log.v(TAG, "sendGetParameterCommand(request=\"$request\", cSeq=$cSeq)")
         sendSimpleCommand("GET_PARAMETER", outputStream, request, cSeq, userAgent, session, authToken)
     }
 
@@ -241,7 +240,7 @@ internal object RtspClientUtils {
         userAgent: String?,
         authToken: String?
     ) {
-        Log.v(TAG, "sendDescribeCommand(request=\"$request\", cSeq=$cSeq)")
+        if (Rtsp.DEBUG) Log.v(TAG, "sendDescribeCommand(request=\"$request\", cSeq=$cSeq)")
         outputStream.write(("DESCRIBE $request RTSP/1.0$CRLF").toByteArray())
         outputStream.write(("Accept: application/sdp$CRLF").toByteArray())
         if (authToken != null) {
@@ -264,7 +263,7 @@ internal object RtspClientUtils {
         authToken: String?,
         session: String?
     ) {
-        Log.v(TAG, "sendTeardownCommand(request=\"$request\", cSeq=$cSeq)")
+        if (Rtsp.DEBUG) Log.v(TAG, "sendTeardownCommand(request=\"$request\", cSeq=$cSeq)")
         outputStream.write(("TEARDOWN $request RTSP/1.0$CRLF").toByteArray())
         if (authToken != null) outputStream.write(("Authorization: $authToken$CRLF").toByteArray())
         outputStream.write(("CSeq: $cSeq$CRLF").toByteArray())
@@ -284,7 +283,7 @@ internal object RtspClientUtils {
         session: String?,
         interleaved: String
     ) {
-        Log.v(TAG, "sendSetupCommand(request=\"$request\", cSeq=$cSeq)")
+        if (Rtsp.DEBUG) Log.v(TAG, "sendSetupCommand(request=\"$request\", cSeq=$cSeq)")
         outputStream.write(("SETUP $request RTSP/1.0$CRLF").toByteArray())
         outputStream.write(("Transport: RTP/AVP/TCP;unicast;interleaved=$interleaved$CRLF").toByteArray())
         if (authToken != null) outputStream.write(("Authorization: $authToken$CRLF").toByteArray())
@@ -304,7 +303,7 @@ internal object RtspClientUtils {
         authToken: String?,
         session: String
     ) {
-        Log.v(TAG, "sendPlayCommand(request=\"$request\", cSeq=$cSeq)")
+        if (Rtsp.DEBUG) Log.v(TAG, "sendPlayCommand(request=\"$request\", cSeq=$cSeq)")
         outputStream.write(("PLAY $request RTSP/1.0$CRLF").toByteArray())
         outputStream.write(("Range: npt=0.000-$CRLF").toByteArray())
         if (authToken != null) outputStream.write(("Authorization: $authToken$CRLF").toByteArray())
@@ -375,7 +374,7 @@ internal object RtspClientUtils {
                                             "h265" -> (tracks[0] as VideoTrack).videoCodec = VIDEO_CODEC_H265
                                             else -> Log.w(TAG, "Unknown video codec \"" + values[0] + "\"")
                                         }
-                                        Log.i(TAG, "Video: " + values[0])
+                                        if (Rtsp.DEBUG) Log.i(TAG, "Video: " + values[0])
                                     }
                                 }
                             } else {
@@ -394,10 +393,13 @@ internal object RtspClientUtils {
                                         track.sampleRateHz = values[1].toInt()
                                         // If no channels specified, use mono, e.g. "a=rtpmap:97 MPEG4-GENERIC/8000"
                                         track.channels = if (values.size > 2) values[2].toInt() else 1
-                                        Log.i(
-                                            TAG, "Audio: " + (if (track.audioCodec == AUDIO_CODEC_AAC) "AAC LC" else "n/a") + ", sample rate: "
-                                                    + track.sampleRateHz + " Hz, channels: " + track.channels
-                                        )
+                                        if (Rtsp.DEBUG) {
+                                            Log.i(
+                                                TAG,
+                                                "Audio: " + (if (track.audioCodec == AUDIO_CODEC_AAC) "AAC LC" else "n/a") + ", sample rate: "
+                                                        + track.sampleRateHz + " Hz, channels: " + track.channels
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -452,7 +454,7 @@ internal object RtspClientUtils {
             }
             return retParams
         } else {
-            Log.e(TAG, "Not a valid fmtp")
+            if (Rtsp.DEBUG) Log.e(TAG, "Not a valid fmtp")
         }
         return null
     }
@@ -667,7 +669,7 @@ internal object RtspClientUtils {
 
     @Throws(IOException::class)
     internal fun readData(inputStream: InputStream, buffer: ByteArray, offset: Int, length: Int): Int {
-        Log.v(TAG, "readData(offset=$offset, length=$length)")
+        if (Rtsp.DEBUG) Log.v(TAG, "readData(offset=$offset, length=$length)")
         var readBytes: Int
         var totalReadBytes = 0
         do {
