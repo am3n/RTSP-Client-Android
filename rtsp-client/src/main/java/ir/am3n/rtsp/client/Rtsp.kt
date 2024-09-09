@@ -5,23 +5,31 @@ import android.media.Image
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.os.Process.*
+import android.os.Process.THREAD_PRIORITY_URGENT_AUDIO
+import android.os.Process.setThreadPriority
 import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import ir.am3n.rtsp.client.decoders.AudioDecoder
-import ir.am3n.rtsp.client.decoders.FrameQueue
-import ir.am3n.rtsp.client.decoders.VideoDecoder
-import ir.am3n.rtsp.client.data.Frame
+import ir.am3n.rtsp.client.data.AudioFrame
+import ir.am3n.rtsp.client.interfaces.Frame
 import ir.am3n.rtsp.client.data.SdpInfo
+import ir.am3n.rtsp.client.data.VideoFrame
+import ir.am3n.rtsp.client.decoders.AudioDecoder
+import ir.am3n.rtsp.client.decoders.AudioFrameQueue
+import ir.am3n.rtsp.client.decoders.VideoDecoder
+import ir.am3n.rtsp.client.decoders.VideoFrameQueue
 import ir.am3n.rtsp.client.interfaces.RtspClientListener
 import ir.am3n.rtsp.client.interfaces.RtspFrameListener
 import ir.am3n.rtsp.client.interfaces.RtspStatusListener
+import ir.am3n.utils.AudioCodecType
 import ir.am3n.utils.NetUtils
+import ir.am3n.utils.VideoCodecType
+import ir.am3n.utils.VideoCodecUtils
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.math.min
 
 class Rtsp {
 
@@ -39,6 +47,8 @@ class Rtsp {
                     setStatusListener(object : RtspStatusListener {
                         override fun onConnecting() {}
                         override fun onConnected(sdpInfo: SdpInfo) {}
+                        override fun onFirstFrameRendered() {}
+                        override fun onDisconnecting() {}
                         override fun onDisconnected() {
                             setStatusListener(null)
                             setFrameListener(null)
@@ -62,10 +72,13 @@ class Rtsp {
                             stop()
                             it.resume(true)
                         }
-                        override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {}
+                        override fun onVideoFrameReceived(
+                            width: Int, height: Int, mediaImage: Image?,
+                            yuv420Bytes: ByteArray?, nv21Bytes: ByteArray?, bitmap: Bitmap?
+                        ) {}
                         override fun onAudioSampleReceived(frame: Frame?) {}
                     })
-                    start(requestVideo = true, requestAudio = false, autoPlayAudio = false)
+                    start(playVideo = true, playAudio = false)
                 }
             }
         }
@@ -97,8 +110,8 @@ class Rtsp {
 
                 // Blocking call until stopped variable is true or connection failed
                 val rtspClient = RtspClient.Builder(socket, uri.toString(), rtspStopped, clientListener)
-                    .requestVideo(requestVideo)
-                    .requestAudio(requestAudio)
+                    .requestVideo(playVideo)
+                    .requestAudio(playAudio)
                     .withUserAgent(userAgent)
                     .withCredentials(username, password)
                     .build()
@@ -122,15 +135,19 @@ class Rtsp {
     private var password: String? = null
     private var userAgent: String? = null
     private var timeout: Long = 5000
-    private var requestVideo = true
+
+    private var playVideo = true
     private var requestMediaImage = false
     private var requestYuvBytes = false
+    private var requestNv21Bytes = false
     private var requestBitmap = false
-    private var requestAudio = true
-    private var autoPlayAudio = true
+
+    private var playAudio = true
+    private var requestAudio = false
+
     private var rtspThread: RtspThread? = null
-    private var videoQueue = FrameQueue(frameQueueSize = 120)
-    private var audioQueue = FrameQueue(frameQueueSize = 120)
+    private var videoQueue = VideoFrameQueue(frameQueueCapacity = 120)
+    private var audioQueue = AudioFrameQueue(frameQueueCapacity = 120)
     private var videoDecoder: VideoDecoder? = null
     private var audioDecoder: AudioDecoder? = null
 
@@ -146,6 +163,10 @@ class Rtsp {
     private var audioCodecConfig: ByteArray? = null
 
     private val clientListener = object : RtspClientListener {
+
+        override fun onRtspConnecting() {
+            if (DEBUG) Log.v(TAG, "onRtspConnecting()")
+        }
 
         override fun onRtspConnected(sdpInfo: SdpInfo) {
             if (DEBUG) Log.v(TAG, "onRtspConnected()")
@@ -165,7 +186,16 @@ class Rtsp {
                     val data = ByteArray(sps.size + pps.size)
                     sps.copyInto(data, 0, 0, sps.size)
                     pps.copyInto(data, sps.size, 0, pps.size)
-                    videoQueue.push(Frame(data, 0, data.size, 0))
+                    videoQueue.push(
+                        VideoFrame(
+                            VideoCodecType.H264,
+                            isKeyframe = true,
+                            data,
+                            offset = 0,
+                            data.size,
+                            timestamp = 0
+                        )
+                    )
                 } else {
                     if (DEBUG) Log.d(TAG, "RTSP SPS and PPS NAL units missed in SDP")
                 }
@@ -186,27 +216,34 @@ class Rtsp {
         }
 
         override fun onRtspVideoNalUnitReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
+            val isKeyframe = VideoCodecUtils.isAnyH264KeyFrame(data, offset, min(length, 1000))
             if (length > 0) {
-                videoQueue.push(Frame(data, offset, length, timestamp))
-                frameListener?.onVideoNalUnitReceived(Frame(data, offset, length, timestamp))
+                videoQueue.push(VideoFrame(VideoCodecType.H264, isKeyframe, data, offset, length, timestamp))
+                frameListener?.onVideoNalUnitReceived(VideoFrame(VideoCodecType.H264, isKeyframe, data, offset, length, timestamp))
             } else {
                 frameListener?.onVideoNalUnitReceived(null)
                 if (DEBUG) Log.e(TAG, "onRtspVideoNalUnitReceived() zero length")
             }
         }
 
-        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
-            frameListener?.onVideoFrameReceived(width, height, mediaImage, yuv420Bytes, bitmap)
+        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, nv21Bytes: ByteArray?, bitmap: Bitmap?) {
+            frameListener?.onVideoFrameReceived(width, height, mediaImage, yuv420Bytes, nv21Bytes, bitmap)
         }
 
         override fun onRtspAudioSampleReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
             if (length > 0) {
-                audioQueue.push(Frame(data, offset, length, timestamp))
-                frameListener?.onAudioSampleReceived(Frame(data, offset, length, timestamp))
+                audioQueue.push(AudioFrame(AudioCodecType.AAC_LC, data, offset, length, timestamp))
+                if (requestAudio) {
+                    frameListener?.onAudioSampleReceived(AudioFrame(AudioCodecType.AAC_LC, data, offset, length, timestamp))
+                }
             } else {
                 frameListener?.onAudioSampleReceived(null)
                 if (DEBUG) Log.e(TAG, "onRtspAudioSampleReceived() zero length")
             }
+        }
+
+        override fun onRtspDisconnecting() {
+            if (DEBUG) Log.v(TAG, "onRtspConnected()")
         }
 
         override fun onRtspDisconnected() {
@@ -265,13 +302,12 @@ class Rtsp {
         this.audioQueue.timeout = timeout
     }
 
-    fun start(requestVideo: Boolean = true, requestAudio: Boolean = true, autoPlayAudio: Boolean = true) {
+    fun start(playVideo: Boolean = true, playAudio: Boolean = true) {
         if (DEBUG) Log.v(TAG, "start()")
         if (isStarted()) return
         rtspThread?.stopAsync()
-        this.requestVideo = requestVideo
-        this.requestAudio = requestAudio
-        this.autoPlayAudio = autoPlayAudio
+        this.playVideo = playVideo
+        this.playAudio = playAudio
         rtspThread = RtspThread()
         rtspThread!!.start()
     }
@@ -311,9 +347,18 @@ class Rtsp {
         this.videoDecoder?.requestYuvBytes = requestYuvBytes
     }
 
+    fun setRequestNv21Bytes(requestNv21Bytes: Boolean) {
+        this.requestNv21Bytes = requestNv21Bytes
+        this.videoDecoder?.requestNv21Bytes = requestNv21Bytes
+    }
+
     fun setRequestBitmap(requestBitmap: Boolean) {
         this.requestBitmap = requestBitmap
         this.videoDecoder?.requestBitmap = requestBitmap
+    }
+
+    fun setRequestAudioSample(requestAudio: Boolean) {
+        this.requestAudio = requestAudio
     }
 
     private fun onRtspClientStarted() {
@@ -330,20 +375,24 @@ class Rtsp {
 
     private fun startDecoders(sdpInfo: SdpInfo) {
         if (DEBUG) Log.v(TAG, "startDecoders()")
-        if (requestVideo && videoMimeType.isNotEmpty()) {
+        if (playVideo && videoMimeType.isNotEmpty()) {
             if (DEBUG) Log.i(TAG, "Starting video decoder with mime type \"$videoMimeType\"")
             surfaceView?.holder?.addCallback(surfaceCallback)
             videoDecoder?.stopAsync()
             videoDecoder = VideoDecoder(
-                surfaceView, requestMediaImage, requestYuvBytes, requestBitmap, videoMimeType,
-                sdpInfo.videoTrack!!.frameWidth, sdpInfo.videoTrack!!.frameHeight, videoQueue, clientListener
+                surface = null, surfaceView, requestMediaImage, requestYuvBytes, requestNv21Bytes, requestBitmap,
+                videoMimeType, sdpInfo.videoTrack!!.frameWidth, sdpInfo.videoTrack!!.frameHeight, rotation = 0,
+                videoQueue, clientListener = clientListener
             )
             videoDecoder!!.start()
         }
-        if (requestAudio && autoPlayAudio && audioMimeType.isNotEmpty()) {
+        if (playAudio && audioMimeType.isNotEmpty()) {
             if (DEBUG) Log.i(TAG, "Starting audio decoder with mime type \"$audioMimeType\"")
             audioDecoder?.stopAsync()
-            audioDecoder = AudioDecoder(audioMimeType, audioSampleRate, audioChannelCount, audioCodecConfig, audioQueue)
+            audioDecoder = AudioDecoder(
+                audioMimeType, audioSampleRate, audioChannelCount,
+                audioCodecConfig, audioQueue
+            )
             audioDecoder!!.start()
         }
     }

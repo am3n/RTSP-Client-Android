@@ -5,12 +5,12 @@ android {
 
     namespace 'ir.am3n.rtsp.client.demo'
 
-    compileSdkVersion 33
+    compileSdkVersion 34
 
     defaultConfig {
         applicationId "ir.am3n.rtsp.client.demo"
-        minSdkVersion 21
-        targetSdkVersion 33
+        minSdkVersion 23
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
         multiDexEnabled true

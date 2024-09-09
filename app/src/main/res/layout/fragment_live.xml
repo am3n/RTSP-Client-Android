@@ -74,25 +74,24 @@
     </LinearLayout>
 
 
-    <FrameLayout
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@+id/linr"
-        android:animateLayoutChanges="true">
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/linr">
 
         <SurfaceView
             android:id="@+id/svVideo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
-        <ProgressBar
-            android:id="@+id/pbLoading"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="gone" />
+        <ir.am3n.rtsp.client.widget.RtspSurfaceView
+            android:id="@+id/rsv"
+            android:layout_width="match_parent"
+            android:layout_height="250dp"
+            android:layout_below="@+id/svVideo"
+            android:layout_marginTop="8dp" />
 
-    </FrameLayout>
+    </RelativeLayout>
 
     <ImageView
         android:id="@+id/img"

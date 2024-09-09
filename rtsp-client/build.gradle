@@ -5,16 +5,27 @@ plugins {
 
 android {
     namespace 'ir.am3n.rtsp.client'
-    compileSdkVersion 33
+    compileSdkVersion 34
     defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 33
+        minSdkVersion 23
+        targetSdkVersion 34
         multiDexEnabled true
     }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
+    }
+
 }
 
 dependencies {
     implementation "androidx.annotation:annotation:1.5.0"
     implementation "com.google.android.exoplayer:exoplayer-core:2.18.3"
+    implementation "androidx.media3:media3-exoplayer:1.4.1"
     api project(path: ':renderscript-toolkit')
 }

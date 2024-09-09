@@ -9,10 +9,11 @@ import android.text.TextWatcher
 import android.util.Log
 import android.view.*
 import android.widget.Toast
+import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import ir.am3n.rtsp.client.Rtsp
-import ir.am3n.rtsp.client.data.Frame
+import ir.am3n.rtsp.client.interfaces.Frame
 import ir.am3n.rtsp.client.data.SdpInfo
 import ir.am3n.rtsp.client.demo.databinding.FragmentLiveBinding
 import ir.am3n.rtsp.client.interfaces.RtspFrameListener
@@ -21,6 +22,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.lang.Thread.sleep
+import kotlin.concurrent.thread
 
 @SuppressLint("SetTextI18n")
 class LiveFragment : Fragment() {
@@ -46,7 +49,6 @@ class LiveFragment : Fragment() {
         override fun onConnecting() {
             binding.tvFrameRate.text = ""
             binding.tvStatus.text = "RTSP connecting"
-            binding.pbLoading.visibility = View.VISIBLE
             binding.etRtspRequest.isEnabled = false
         }
 
@@ -55,7 +57,14 @@ class LiveFragment : Fragment() {
             binding.tvFrameRate.text = ""
             binding.tvStatus.text = "RTSP connected"
             binding.bnStartStop.text = "Stop RTSP"
-            binding.pbLoading.visibility = View.GONE
+        }
+
+        override fun onFirstFrameRendered() {
+
+        }
+
+        override fun onDisconnecting() {
+
         }
 
         override fun onDisconnected() {
@@ -64,7 +73,6 @@ class LiveFragment : Fragment() {
             binding.tvFrameRate.text = ""
             binding.tvStatus.text = "RTSP disconnected"
             binding.bnStartStop.text = "Start RTSP"
-            binding.pbLoading.visibility = View.GONE
             binding.etRtspRequest.isEnabled = true
             onError()
         }
@@ -73,14 +81,12 @@ class LiveFragment : Fragment() {
             disconnectCount++
             binding.tvFrameRate.text = ""
             binding.tvStatus.text = "RTSP username or password invalid"
-            binding.pbLoading.visibility = View.GONE
             onError()
         }
 
         override fun onFailed(message: String?) {
             disconnectCount++
             binding.tvStatus.text = "Error: $message"
-            binding.pbLoading.visibility = View.GONE
             onError()
         }
 
@@ -123,30 +129,18 @@ class LiveFragment : Fragment() {
             }
         }
 
-        override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
-            Log.d(TAG, "onVideoFrameReceived()  mediaImage: $mediaImage   yuv420Bytes: $yuv420Bytes   bitmap: $bitmap")
-
-            /**
-            val task = textRecognizer.process(InputImage.fromBitmap(mediaImage, 0))
-            val text = Tasks.await(task, 2000, TimeUnit.MILLISECONDS)
-             */
-
-            /**
-            if (yuv420Bytes != null) {
-            Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
-            }
-             */
-
-            /**
+        override fun onVideoFrameReceived(
+            width: Int, height: Int, mediaImage: Image?,
+            yuv420Bytes: ByteArray?, nv21Bytes: ByteArray?, bitmap: Bitmap?
+        ) {
+            Log.d(TAG, "onVideoFrameReceived()   img: $mediaImage   yuv: $yuv420Bytes   nv21: $nv21Bytes   bmp: $bitmap")
             binding.img.run {
-            post { setImageBitmap(bitmap?.removeTimestamp()) }
+                post { setImageBitmap(bitmap) }
             }
-             */
-
         }
 
         override fun onAudioSampleReceived(frame: Frame?) {
-
+            Log.d(TAG, "onAudioSampleReceived()   ${frame?.data?.size}")
         }
 
     }
@@ -186,17 +180,29 @@ class LiveFragment : Fragment() {
             if (rtsp.isStarted()) {
                 rtsp.stop()
             } else {
-                rtsp.init(liveViewModel.rtspRequest.value!!/*, username = "admin", password = "8888"*/, timeout = 2_000)
-                rtsp.start(requestVideo = true, requestAudio = false, autoPlayAudio = false)
+
+                binding.rsv.init(liveViewModel.rtspRequest.value!!.toUri())
+                binding.rsv.start(playVideo = true, playAudio = true)
+
+                thread {
+                    sleep(2000)
+                    rtsp.init(liveViewModel.rtspRequest.value!!, timeout = 2_000)
+                    rtsp.start(playVideo = true, playAudio = true)
+                }
+
             }
         }
 
         rtsp.setStatusListener(rtspStatusListener)
         rtsp.setFrameListener(rtspFrameListener)
+
         rtsp.setSurfaceView(binding.svVideo)
+
         //rtsp.setRequestMediaImage(true)
         //rtsp.setRequestYuvBytes(true)
+        //rtsp.setRequestNv21Bytes(true)
         //rtsp.setRequestBitmap(true)
+        //rtsp.setRequestAudioSample(true)
 
         return binding.root
     }
@@ -211,13 +217,6 @@ class LiveFragment : Fragment() {
         super.onPause()
         if (Rtsp.DEBUG) Log.v(TAG, "onPause()")
         liveViewModel.saveParams(requireContext())
-    }
-
-    private fun Bitmap.removeTimestamp(): Bitmap {
-        Canvas(this).apply {
-            drawRect(Rect(19, 12, 444, 40), Paint().apply { color = Color.LTGRAY })
-        }
-        return this
     }
 
 }

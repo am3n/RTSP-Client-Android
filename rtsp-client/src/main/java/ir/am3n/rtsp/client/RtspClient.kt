@@ -3,7 +3,7 @@ package ir.am3n.rtsp.client
 import android.text.TextUtils
 import android.util.Log
 import android.util.Pair
-import ir.am3n.rtsp.client.RtspClientUtils.AUDIO_CODEC_AAC
+import ir.am3n.rtsp.client.RtspClientUtils.AUDIO_CODEC_UNKNOWN
 import ir.am3n.rtsp.client.RtspClientUtils.CRLF
 import ir.am3n.rtsp.client.RtspClientUtils.MAX_LINE_SIZE
 import ir.am3n.rtsp.client.RtspClientUtils.RTSP_CAPABILITY_GET_PARAMETER
@@ -124,6 +124,7 @@ internal class RtspClient private constructor(builder: Builder) {
         if (Rtsp.DEBUG) Log.v(TAG, "execute()")
         try {
 
+            listener.onRtspConnecting()
             val inputStream = rtspSocket.getInputStream()
             val outputStream: OutputStream = LoggerOutputStream(rtspSocket.getOutputStream())
             var sdpInfo = SdpInfo()
@@ -203,7 +204,7 @@ internal class RtspClient private constructor(builder: Builder) {
                     if (!requestAudio)
                         sdpInfo.audioTrack = null
                     // Only AAC supported
-                    if (sdpInfo.audioTrack != null && sdpInfo.audioTrack?.audioCodec != AUDIO_CODEC_AAC) {
+                    if (sdpInfo.audioTrack != null && sdpInfo.audioTrack?.audioCodec == AUDIO_CODEC_UNKNOWN) {
                         if (Rtsp.DEBUG) Log.e(TAG, "Unknown RTSP audio codec (" + sdpInfo.audioTrack?.audioCodec + ") specified in SDP")
                         sdpInfo.audioTrack = null
                     }
@@ -329,6 +330,7 @@ internal class RtspClient private constructor(builder: Builder) {
                 throw Exception("No tracks found. RTSP server issue.")
             }
 
+            listener.onRtspDisconnecting()
             listener.onRtspDisconnected()
 
         } catch (e: UnauthorizedException) {
@@ -336,6 +338,7 @@ internal class RtspClient private constructor(builder: Builder) {
             listener.onRtspFailedUnauthorized()
         } catch (e: InterruptedException) {
             // Thread interrupted. Expected behavior.
+            listener.onRtspDisconnecting()
             listener.onRtspDisconnected()
         } catch (t: Throwable) {
             t.printStackTrace()

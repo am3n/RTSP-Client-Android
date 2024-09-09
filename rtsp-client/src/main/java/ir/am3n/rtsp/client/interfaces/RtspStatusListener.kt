@@ -5,6 +5,8 @@ import ir.am3n.rtsp.client.data.SdpInfo
 interface RtspStatusListener {
     fun onConnecting()
     fun onConnected(sdpInfo: SdpInfo)
+    fun onFirstFrameRendered()
+    fun onDisconnecting()
     fun onDisconnected()
     fun onUnauthorized()
     fun onFailed(message: String?)

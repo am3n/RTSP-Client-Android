@@ -1,20 +1,23 @@
 # Rtsp client android
-![MinAPI](https://img.shields.io/badge/API-21%2B-blue)
+![MinAPI](https://img.shields.io/badge/API-23%2B-blue)
 [![Release](https://jitpack.io/v/am3n/RTSP-Client-Android.svg)](https://jitpack.io/#am3n/RTSP-Client-Android)
 
-Lightweight RTSP client library for Android.
+<b>Lightweight RTSP client library for Android</b> with almost zero lag video decoding (achieved 20 msec video decoding latency on some RTSP streams). Designed for lag criticial applications (e.g. video surveillance from drones).
+
+Unlike [AndroidX Media ExoPlayer](https://github.com/androidx/media) which also supports RTSP, this library does not make any video buffering. Video frames are shown immidiately when they arrive.
 
 ![Screenshot](docs/images/Screenshot_20221026_182823.png?raw=true "Screenshot")
 
 ## Features
 
-- Android min API 21.
+- Android min API 24.
 - RTSP/RTSPS over TCP.
 - Video H.264 only.
 - Audio AAC LC only.
 - Basic/Digest authentication.
 - Supports majority of RTSP IP cameras.
-- Auto Decode H.264 to Media Image & YUV ByteArray & Bitmap.
+- Auto Decode raw frames to Media Image & YUV ByteArray & NV21 ByteArray & Bitmap.
+- Using [renderscript-intrinsics-replacement-toolkit](https://github.com/android/renderscript-intrinsics-replacement-toolkit) for NV21 to Bitmap decoding.
 
 ## Permissions
 
@@ -39,7 +42,43 @@ dependencies {
 
 ## Usage
 
-### 1) Easiest way is just to use `SurfaceView` class for showing video stream in UI.
+### 1) RtspSurfaceView
+
+Easiest way is just to use `RtspSurfaceView` class for showing video stream.
+
+```xml
+<ir.am3n.rtsp.client.widget.RtspSurfaceView
+    android:id="@+id/rsv"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />
+```
+
+Then in code use:
+
+```kotlin
+val url = "rtsps://10.0.1.3/test.sdp"
+val username = "admin"
+val password = "secret"
+binding.rsv.init(url, username, password)
+binding.rsv.setStatusListener(object : RtspStatusListener {
+    override fun onConnecting() {}
+    override fun onConnected(sdpInfo: SdpInfo) {}
+    override fun onFirstFrameRendered() {}
+    override fun onDisconnecting() {}
+    override fun onDisconnected() {}
+    override fun onUnauthorized() {}
+    override fun onFailed(message: String?) {}
+})
+binding.rsv.start(playVideo = true, playAudio = true)
+// ...
+binding.rsv.stop()
+```
+
+---
+
+### 2) Default Android SurfaceView
+
+Next way is default `SurfaceView` class for showing video stream.
 
 ```xml
 <SurfaceView
@@ -60,118 +99,137 @@ rtsp.init(url, username, password)
 rtsp.setStatusListener(object : RtspStatusListener {
     override fun onConnecting() {}
     override fun onConnected(sdpInfo: SdpInfo) {}
+    override fun onFirstFrameRendered() {}
+    override fun onDisconnecting() {}
     override fun onDisconnected() {}
     override fun onUnauthorized() {}
     override fun onFailed(message: String?) {}
 })
 // ###################################################
 rtsp.setSurfaceView(binding.svVideo)
-rtsp.start()
+rtsp.setRequestAudioSample(true)
+rtsp.start(playVideo = true, playAudio = true)
 // ...
 rtsp.stop()
 ```
 
 ---
 
-### 2) You can still use library without any decoding (just for obtaining raw H264 frames) 
+### 3) H264 raw frame
+
+You can still use library without any decoding. (Just for obtaining raw H264 frames)
+
 e.g. for writing video stream into MP4 via muxer.
 
 ```kotlin
 // ... build rtsp
 rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {
-        // Send raw H264 NAL unit to decoder
+        // Send raw H264 NAL unit to your custom decoder
     }
     override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {}
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
 })
-rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
+rtsp.setRequestAudioSample(true)
+rtsp.start(playVideo = true, playAudio = true)
 // ...
 rtsp.stop()
 ```
 
 ---
 
-### 3) You can still use library with H264 to YUV MediaImage decoding
+### 4) MediaImage
+
+You can still use library with H264 to YUV MediaImage decoding.
 
 ```kotlin
 // ... build rtsp
 rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {}
-    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
-        if (mediaImage != null) {
-            // Just use it!
-            // Notice that you should use that sync on this thread
-            /**
-            val task = textRecognizer.process(InputImage.fromBitmap(mediaImage, 0))
-            val text = Tasks.await(task, 2000, TimeUnit.MILLISECONDS)
-             */
-        }
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) { 
+        // Notice: you should use mediaImage object sync on this thread
     }
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
 })
+rtsp.setRequestAudioSample(true)
 rtsp.setRequestMediaImage(true)
-rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
+rtsp.start(playVideo = true, playAudio = true)
 // ...
 rtsp.stop()
 ```
 
 ---
 
-### 4) You can still use library with H264 to YUV ByteArray decoding
+### 5) YUV byte array
+
+You can still use library with H264 to YUV420 ByteArray decoding.
 
 ```kotlin
 // ... build rtsp
 rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {}
     override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
-        // you can decode YUV to Bitmap by Android New RenderScript Toolkit that integrated in the library 
-        // or your custom decoder
-        /**
-        if (yuv420Bytes != null) {
-            Toolkit.yuvToRgbBitmap(yuv420Bytes, width, height, YuvFormat.YUV_420_888)
-        }
-         */
+        // you can decode YUV420 to Bitmap by your custom decoder
     }
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
 })
+rtsp.setRequestAudioSample(true)
 rtsp.setRequestYuvBytes(true)
-rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
+rtsp.start(playVideo = true, playAudio = true)
 // ...
 rtsp.stop()
 ```
 
 ---
 
+### 6) NV21 byte array
 
-### 5) You can still use library with H264 to Bitmap decoding
+You can still use library with H264 to NV21 ByteArray decoding.
 
 ```kotlin
 // ... build rtsp
 rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {}
     override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
-        if (bitmap != null) {
-            // Just use it!
-            /**
-            binding.img.run {
-                post { setImageBitmap(bitmap) }
-            }
-             */
-        }
+        // you can decode NV21 to Bitmap by your custom decoder
     }
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
 })
+rtsp.setRequestAudioSample(true)
+rtsp.setRequestNv21Bytes(true)
+rtsp.start(playVideo = true, playAudio = true)
+// ...
+rtsp.stop()
+```
+
+---
+
+### 7) Bitmap
+
+You can still use library with H264 to Bitmap decoding.
+
+```kotlin
+// ... build rtsp
+rtsp.setFrameListener(object : RtspFrameListener {
+    override fun onVideoNalUnitReceived(frame: Frame?) {}
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
+        // Use the bitmap
+    }
+    override fun onAudioSampleReceived(frame: Frame?) {
+        // Send raw audio to decoder
+    }
+})
+rtsp.setRequestAudioSample(true)
 rtsp.setRequestBitmap(true)
-rtsp.start(autoPlayAudio = false) // turn off autoPlayAudio
+rtsp.start(playVideo = true, playAudio = true)
 // ...
 rtsp.stop()
 ```

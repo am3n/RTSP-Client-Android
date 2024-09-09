@@ -4,6 +4,7 @@ import android.text.TextUtils
 import android.util.Base64
 import android.util.Log
 import android.util.Pair
+import ir.am3n.rtsp.client.data.ApplicationTrack
 import ir.am3n.rtsp.client.data.AudioTrack
 import ir.am3n.rtsp.client.data.SdpInfo
 import ir.am3n.rtsp.client.data.Track
@@ -11,11 +12,11 @@ import ir.am3n.rtsp.client.data.VideoTrack
 import ir.am3n.rtsp.client.exceptions.UnauthorizedException
 import ir.am3n.rtsp.client.interfaces.RtspClientKeepAliveListener
 import ir.am3n.rtsp.client.interfaces.RtspClientListener
-import ir.am3n.rtsp.client.parser.AudioParser
+import ir.am3n.rtsp.client.parser.AacParser
 import ir.am3n.rtsp.client.parser.RtpParser
-import ir.am3n.rtsp.client.parser.VideoParser
+import ir.am3n.rtsp.client.parser.VideoRtpParser
 import ir.am3n.utils.NetUtils
-import ir.am3n.rtsp.client.codecs.H264
+import ir.am3n.utils.VideoCodecUtils
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal object RtspClientUtils {
 
     private const val TAG = "RtspClientUtils"
+    private val EMPTY_ARRAY: ByteArray = ByteArray(0)
 
     private const val RTSP_CAPABILITY_NONE = 0
     private const val RTSP_CAPABILITY_OPTIONS = 1 shl 1
@@ -43,14 +45,23 @@ internal object RtspClientUtils {
     internal const val RTSP_CAPABILITY_GET_PARAMETER = 1 shl 10
     private const val RTSP_CAPABILITY_REDIRECT = 1 shl 11
 
-    internal const val VIDEO_CODEC_H264 = 0
-    internal const val VIDEO_CODEC_H265 = 1
     internal const val AUDIO_CODEC_UNKNOWN = -1
     internal const val AUDIO_CODEC_AAC = 0
+    internal const val AUDIO_CODEC_OPUS = 1
+    internal const val VIDEO_CODEC_H264 = 0
+    internal const val VIDEO_CODEC_H265 = 1
     internal const val CRLF = "\r\n"
 
     // Size of buffer for reading from the connection
     internal const val MAX_LINE_SIZE = 4098
+
+    internal fun getAudioCodecName(codec: Int): String {
+        return when (codec) {
+            AUDIO_CODEC_AAC -> "AAC"
+            AUDIO_CODEC_OPUS -> "Opus"
+            else -> "Unknown"
+        }
+    }
 
     internal fun hasCapability(capability: Int, capabilitiesMask: Int): Boolean {
         return capabilitiesMask and capability != 0
@@ -95,18 +106,23 @@ internal object RtspClientUtils {
         keepAliveTimeout: Int,
         keepAliveListener: RtspClientKeepAliveListener
     ) {
-        var data = ByteArray(0) // Usually not bigger than MTU = 15KB
-        val videoParser: VideoParser? =
+
+        var data = EMPTY_ARRAY // Usually not bigger than MTU = 15KB
+        val videoParser: VideoRtpParser? =
             if (sdpInfo.videoTrack != null) {
                 when (sdpInfo.videoTrack!!.videoCodec) {
-                    VIDEO_CODEC_H264 -> H264()
-                    VIDEO_CODEC_H265 -> H264()
+                    VIDEO_CODEC_H264 -> VideoRtpParser()
+                    VIDEO_CODEC_H265 -> VideoRtpParser()
                     else -> null
                 }
             } else null
-        val audioParser = if (sdpInfo.audioTrack?.audioCodec == AUDIO_CODEC_AAC) AudioParser(sdpInfo.audioTrack!!.mode!!) else null
+        val audioParser = if (sdpInfo.audioTrack?.audioCodec == AUDIO_CODEC_AAC) AacParser(sdpInfo.audioTrack!!.mode!!) else null
+
         var nalUnitSps = if (sdpInfo.videoTrack != null) sdpInfo.videoTrack!!.sps else null
         var nalUnitPps = if (sdpInfo.videoTrack != null) sdpInfo.videoTrack!!.pps else null
+        var nalUnitSei: ByteArray = EMPTY_ARRAY
+        var videoSeqNum = 0
+
         var keepAliveSent = System.currentTimeMillis()
 
         while (!exitFlag.get()) {
@@ -132,43 +148,64 @@ internal object RtspClientUtils {
 
             // Video
             if (header.payloadType == sdpInfo.videoTrack?.payloadType) {
-                val nalUnit = videoParser?.processPacketAndGetNalUnit(data, header.payloadSize)
+                if (videoSeqNum > header.sequenceNumber)
+                    Log.w(RtspClient.TAG, "Invalid video seq num " + videoSeqNum + "/" + header.sequenceNumber)
+                videoSeqNum = header.sequenceNumber
+                val nalUnit = videoParser?.processRtpPacketAndGetNalUnit(data, header.payloadSize)
                 if (nalUnit != null) {
-                    when (videoParser.getNalUnitType(nalUnit, 0, nalUnit.size)) {
-                        videoParser.NAL_SPS -> {
+                    val type: Byte = VideoCodecUtils.getH264NalUnitType(nalUnit, 0, nalUnit.size)
+                    when (type) {
+                        VideoCodecUtils.NAL_SPS -> {
                             nalUnitSps = nalUnit
                             // Looks like there is NAL_IDR_SLICE as well. Send it now.
                             if (nalUnit.size > 100) {
                                 listener.onRtspVideoNalUnitReceived(nalUnit, 0, nalUnit.size, (header.timeStamp * 11.111111).toLong())
                             }
                         }
-                        videoParser.NAL_PPS -> {
+                        VideoCodecUtils.NAL_PPS -> {
                             nalUnitPps = nalUnit
                             // Looks like there is NAL_IDR_SLICE as well. Send it now.
                             if (nalUnit.size > 100) {
                                 listener.onRtspVideoNalUnitReceived(nalUnit, 0, nalUnit.size, (header.timeStamp * 11.111111).toLong())
                             }
                         }
-                        videoParser.NAL_IDR_SLICE -> {
+                        VideoCodecUtils.NAL_SEI -> {
+                            nalUnitSei = nalUnit
+                        }
+                        VideoCodecUtils.NAL_IDR_SLICE -> {
                             // Combine IDR with SPS/PPS
                             if (nalUnitSps != null && nalUnitPps != null) {
-                                val nalUnitSppPps = ByteArray(nalUnitSps.size + nalUnitPps.size)
-                                System.arraycopy(nalUnitSps, 0, nalUnitSppPps, 0, nalUnitSps.size)
-                                System.arraycopy(nalUnitPps, 0, nalUnitSppPps, nalUnitSps.size, nalUnitPps.size)
-                                listener.onRtspVideoNalUnitReceived(
-                                    nalUnitSppPps,
-                                    offset = 0,
-                                    length = nalUnitSppPps.size,
-                                    timestamp = (header.timeStamp * 11.111111).toLong()
+                                val nalUnitSppPpsIdr = ByteArray(nalUnitSps.size + nalUnitPps.size + nalUnitSei.size + nalUnit.size)
+                                System.arraycopy(nalUnitSps, 0, nalUnitSppPpsIdr, 0, nalUnitSps.size)
+                                System.arraycopy(nalUnitPps, 0, nalUnitSppPpsIdr, nalUnitSps.size, nalUnitPps.size)
+                                System.arraycopy(nalUnitSei, 0, nalUnitSppPpsIdr, nalUnitSps.size + nalUnitPps.size, nalUnitSei.size)
+                                System.arraycopy(
+                                    nalUnit, 0, nalUnitSppPpsIdr, nalUnitSps.size + nalUnitPps.size + nalUnitSei.size, nalUnit.size
                                 )
-                                // Send it only once
+                                listener.onRtspVideoNalUnitReceived(
+                                    nalUnitSppPpsIdr, 0, nalUnitSppPpsIdr.size,
+                                    (header.timeStamp * 11.111111).toLong()
+                                )
                                 nalUnitSps = null
                                 nalUnitPps = null
+                                nalUnitSei = EMPTY_ARRAY
                             }
-                            listener.onRtspVideoNalUnitReceived(nalUnit, offset = 0, nalUnit.size, (header.timeStamp * 11.111111).toLong())
                         }
                         else -> {
-                            listener.onRtspVideoNalUnitReceived(nalUnit, offset = 0, length = nalUnit.size, timestamp = (header.timeStamp * 11.111111).toLong())
+                            if (nalUnitSei.isEmpty()) {
+                                listener.onRtspVideoNalUnitReceived(nalUnit, 0, nalUnit.size, (header.timeStamp * 11.111111).toLong())
+                            } else {
+                                val nalUnitSeiSlice = ByteArray(nalUnitSei.size + nalUnit.size)
+                                System.arraycopy(nalUnitSei, 0, nalUnitSeiSlice, 0, nalUnitSei.size)
+                                System.arraycopy(nalUnit, 0, nalUnitSeiSlice, nalUnitSei.size, nalUnit.size)
+                                listener.onRtspVideoNalUnitReceived(
+                                    nalUnitSeiSlice,
+                                    0,
+                                    nalUnitSeiSlice.size,
+                                    (header.timeStamp * 11.111111).toLong()
+                                )
+                                nalUnitSei = EMPTY_ARRAY
+                            }
                         }
                     }
                 }
@@ -317,10 +354,10 @@ internal object RtspClientUtils {
     /**
      * Get a list of tracks from SDP. Usually contains video and audio track only.
      *
-     * @return array of 2 tracks. First is video track, second audio track.
+     * @return array of 3 tracks. First is video track, second audio track, third application track.
      */
     private fun getTracksFromDescribeParams(params: List<Pair<String, String>>): Array<Track?> {
-        val tracks = arrayOfNulls<Track>(2)
+        val tracks = arrayOfNulls<Track>(3)
         var currentTrack: Track? = null
         for (param in params) {
             when (param.first) {
@@ -331,6 +368,9 @@ internal object RtspClientUtils {
                     } else if (param.second.startsWith("audio")) {
                         currentTrack = AudioTrack()
                         tracks[1] = currentTrack
+                    } else if (param.second.startsWith("application")) {
+                        currentTrack = ApplicationTrack()
+                        tracks[2] = currentTrack
                     } else {
                         currentTrack = null
                     }
@@ -348,7 +388,7 @@ internal object RtspClientUtils {
                             if (currentTrack is VideoTrack) {
                                 // Video
                                 updateVideoTrackFromDescribeParam(tracks[0] as VideoTrack, param)
-                            } else {
+                            } else if (currentTrack is AudioTrack) {
                                 // Audio
                                 updateAudioTrackFromDescribeParam(tracks[1] as AudioTrack, param)
                             }
@@ -363,9 +403,9 @@ internal object RtspClientUtils {
                             }
 
                         } else if (param.second.startsWith("rtpmap:")) {
+                            var values = TextUtils.split(param.second, " ")
                             if (currentTrack is VideoTrack) {
                                 // Video
-                                var values = TextUtils.split(param.second, " ")
                                 if (values.size > 1) {
                                     values = TextUtils.split(values[1], "/")
                                     if (values.isNotEmpty()) {
@@ -377,31 +417,35 @@ internal object RtspClientUtils {
                                         if (Rtsp.DEBUG) Log.i(TAG, "Video: " + values[0])
                                     }
                                 }
-                            } else {
+                            } else if (currentTrack is AudioTrack) {
                                 // Audio
-                                var values = TextUtils.split(param.second, " ")
                                 if (values.size > 1) {
                                     val track = tracks[1] as AudioTrack
                                     values = TextUtils.split(values[1], "/")
                                     if (values.size > 1) {
-                                        if ("mpeg4-generic".equals(values[0], ignoreCase = true)) {
-                                            track.audioCodec = AUDIO_CODEC_AAC
-                                        } else {
-                                            Log.w(TAG, "Unknown audio codec \"" + values[0] + "\"")
-                                            track.audioCodec = AUDIO_CODEC_UNKNOWN
+                                        when (values[0].lowercase()) {
+                                            "mpeg4-generic" -> {
+                                                track.audioCodec = AUDIO_CODEC_AAC
+                                            }
+                                            "opus" -> {
+                                                track.audioCodec = AUDIO_CODEC_OPUS
+                                            }
+                                            else -> {
+                                                Log.w(TAG, "Unknown audio codec \"" + values[0] + "\"")
+                                                track.audioCodec = AUDIO_CODEC_UNKNOWN
+                                            }
                                         }
                                         track.sampleRateHz = values[1].toInt()
                                         // If no channels specified, use mono, e.g. "a=rtpmap:97 MPEG4-GENERIC/8000"
                                         track.channels = if (values.size > 2) values[2].toInt() else 1
                                         if (Rtsp.DEBUG) {
-                                            Log.i(
-                                                TAG,
-                                                "Audio: " + (if (track.audioCodec == AUDIO_CODEC_AAC) "AAC LC" else "n/a") + ", sample rate: "
-                                                        + track.sampleRateHz + " Hz, channels: " + track.channels
-                                            )
+                                            Log.i(TAG, "Audio: " + getAudioCodecName(track.audioCodec) + ", sample rate: " + track.sampleRateHz + " Hz, channels: " + track.channels)
                                         }
                                     }
                                 }
+                            } else {
+                                // Application
+                                // Do nothing
                             }
                         }
                     }
@@ -441,7 +485,7 @@ internal object RtspClientUtils {
     }
 
     private fun getSdpAParams(param: Pair<String, String>): List<Pair<String, String>>? {
-        if (param.first == "a" && param.second.startsWith("fmtp:")) { //
+        if (param.first == "a" && param.second.startsWith("fmtp:") && param.second.length > 8) { //
             val value = param.second.substring(8).trim { it <= ' ' } // fmtp can be '96' (2 chars) and '127' (3 chars)
             val paramsA = TextUtils.split(value, ";")
             val retParams = ArrayList<Pair<String, String>>()
@@ -454,7 +498,7 @@ internal object RtspClientUtils {
             }
             return retParams
         } else {
-            if (Rtsp.DEBUG) Log.e(TAG, "Not a valid fmtp")
+            if (Rtsp.DEBUG) Log.w(TAG, "Not a valid fmtp")
         }
         return null
     }
@@ -463,26 +507,38 @@ internal object RtspClientUtils {
         val params = getSdpAParams(param)
         if (params != null) {
             for (pair in params) {
-                if ("sprop-parameter-sets".equals(pair.first, ignoreCase = true)) {
-                    val paramsSpsPps = TextUtils.split(pair.second, ",")
-                    if (paramsSpsPps.size > 1) {
-                        val sps = Base64.decode(paramsSpsPps[0], Base64.NO_WRAP)
-                        val pps = Base64.decode(paramsSpsPps[1], Base64.NO_WRAP)
-                        val nalSps = ByteArray(sps.size + 4)
-                        val nalPps = ByteArray(pps.size + 4)
-                        // Add 00 00 00 01 NAL unit header
-                        nalSps[0] = 0
-                        nalSps[1] = 0
-                        nalSps[2] = 0
-                        nalSps[3] = 1
-                        System.arraycopy(sps, 0, nalSps, 4, sps.size)
-                        nalPps[0] = 0
-                        nalPps[1] = 0
-                        nalPps[2] = 0
-                        nalPps[3] = 1
-                        System.arraycopy(pps, 0, nalPps, 4, pps.size)
-                        videoTrack.sps = nalSps
-                        videoTrack.pps = nalPps
+                when (pair.first.lowercase()) {
+                    "sprop-parameter-sets" -> {
+                        val paramsSpsPps = TextUtils.split(pair.second, ",")
+                        if (paramsSpsPps.size > 1) {
+                            val sps = Base64.decode(paramsSpsPps[0], Base64.NO_WRAP)
+                            val pps = Base64.decode(paramsSpsPps[1], Base64.NO_WRAP)
+                            val nalSps = ByteArray(sps.size + 4)
+                            val nalPps = ByteArray(pps.size + 4)
+                            // Add 00 00 00 01 NAL unit header
+                            nalSps[0] = 0
+                            nalSps[1] = 0
+                            nalSps[2] = 0
+                            nalSps[3] = 1
+                            System.arraycopy(sps, 0, nalSps, 4, sps.size)
+                            nalPps[0] = 0
+                            nalPps[1] = 0
+                            nalPps[2] = 0
+                            nalPps[3] = 1
+                            System.arraycopy(pps, 0, nalPps, 4, pps.size)
+                            videoTrack.sps = nalSps
+                            videoTrack.pps = nalPps
+                        }
+                    }
+                    "packetization-mode" -> {
+                        // 0 - single NAL unit (default)
+                        // 1 - non-interleaved mode (STAP-A and FU-A NAL units)
+                        // 2 - interleaved mode
+                        try {
+                            val mode = pair.second.toInt()
+                            if (mode == 2) Log.e(RtspClient.TAG, "Interleaved packetization mode is not supported")
+                        } catch (ignored: java.lang.NumberFormatException) {
+                        }
                     }
                 }
             }

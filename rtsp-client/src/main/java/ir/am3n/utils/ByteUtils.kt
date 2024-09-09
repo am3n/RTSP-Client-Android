@@ -21,4 +21,12 @@ internal object ByteUtils {
         return dest
     }
 
+    fun ByteArray.toHexString(offset: Int, maxLength: Int): String {
+        val length = minOf(maxLength, size - offset)
+        return sliceArray(offset until (offset + length))
+            .joinToString(separator = "") { byte ->
+                "%02x ".format(byte).uppercase()
+            }
+    }
+
 }

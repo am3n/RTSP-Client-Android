@@ -1,9 +1,10 @@
 package ir.am3n.rtsp.client.decoders
 
 import android.media.*
+import android.os.Process
 import android.util.Log
 import ir.am3n.rtsp.client.Rtsp
-import ir.am3n.rtsp.client.data.Frame
+import ir.am3n.rtsp.client.interfaces.Frame
 import java.nio.ByteBuffer
 
 class AudioDecoder(
@@ -11,7 +12,7 @@ class AudioDecoder(
     private val sampleRate: Int,
     private val channelCount: Int,
     private val codecConfig: ByteArray?,
-    private val audioFrameQueue: FrameQueue
+    private val audioFrameQueue: AudioFrameQueue
 ) : Thread() {
 
     companion object {
@@ -45,14 +46,9 @@ class AudioDecoder(
             extraData[1] = (extraDataAac and 0xff).toByte()         // low byte
             return extraData
         }
-
     }
 
     private var isRunning = true
-
-    init {
-        name = "RTSP audio thread"
-    }
 
     fun stopAsync() {
         if (Rtsp.DEBUG) Log.v(TAG, "stopAsync()")
@@ -64,14 +60,33 @@ class AudioDecoder(
     override fun run() {
         if (Rtsp.DEBUG) Log.d(TAG, "$name started")
 
+        Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
+
         // Creating audio decoder
         val decoder = MediaCodec.createDecoderByType(mimeType)
         val format = MediaFormat.createAudioFormat(mimeType, sampleRate, channelCount)
 
-        val csd0 = codecConfig ?: getAacDecoderConfigData(MediaCodecInfo.CodecProfileLevel.AACObjectLC, sampleRate, channelCount)
-        val bb = ByteBuffer.wrap(csd0)
-        format.setByteBuffer("csd-0", bb)
-        format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+        if (mimeType == MediaFormat.MIMETYPE_AUDIO_AAC) {
+            val csd0 = codecConfig ?: getAacDecoderConfigData(MediaCodecInfo.CodecProfileLevel.AACObjectLC, sampleRate, channelCount)
+            format.setByteBuffer("csd-0", ByteBuffer.wrap(csd0))
+            format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+        } else if (mimeType == MediaFormat.MIMETYPE_AUDIO_OPUS) {
+            val csd0 = byteArrayOf(
+                0x4f, 0x70, 0x75, 0x73, // "Opus"
+                0x48, 0x65, 0x61, 0x64, // "Head"
+                0x01,  // Version
+                0x02,  // Channel Count
+                0x00, 0x00,  // Pre skip
+                0x80.toByte(), 0xbb.toByte(), 0x00, 0x00, // Sample rate 48000
+                0x00, 0x00,  // Output Gain (Q7.8 in dB)
+                0x00,  // Mapping Family
+            )
+            val csd1 = byteArrayOf(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+            val csd2 = byteArrayOf(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+            format.setByteBuffer("csd-0", ByteBuffer.wrap(csd0))
+            format.setByteBuffer("csd-1", ByteBuffer.wrap(csd1))
+            format.setByteBuffer("csd-2", ByteBuffer.wrap(csd2))
+        }
 
         decoder.configure(format, null, null, 0)
         decoder.start()
@@ -80,7 +95,6 @@ class AudioDecoder(
         val outChannel = if (channelCount > 1) AudioFormat.CHANNEL_OUT_STEREO else AudioFormat.CHANNEL_OUT_MONO
         val outAudio = AudioFormat.ENCODING_PCM_16BIT
         val bufferSize = AudioTrack.getMinBufferSize(sampleRate, outChannel, outAudio)
-        //Log.i(TAG, "sampleRate: $sampleRate, bufferSize: $bufferSize".format(sampleRate, bufferSize))
         val audioTrack = AudioTrack(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -111,9 +125,6 @@ class AudioDecoder(
                 }
                 byteBuffer?.rewind()
 
-                // Preventing BufferOverflowException
-//              if (length > byteBuffer.limit()) throw DecoderFatalException("Error")
-
                 val audioFrame: Frame?
                 try {
                     audioFrame = audioFrameQueue.pop()
@@ -129,16 +140,12 @@ class AudioDecoder(
                     e.printStackTrace()
                 }
             }
-//            Log.i(TAG, "inIndex: ${inIndex}")
 
             try {
-//                Log.w(TAG, "outIndex: ${outIndex}")
                 if (!isRunning) break
                 when (val outIndex = decoder.dequeueOutputBuffer(bufferInfo, 10000L)) {
-                    MediaCodec.INFO_OUTPUT_FORMAT_CHANGED ->
-                        Log.d(TAG, "Decoder format changed: ${decoder.outputFormat}")
-                    MediaCodec.INFO_TRY_AGAIN_LATER ->
-                        if (Rtsp.DEBUG) Log.d(TAG, "No output from decoder available")
+                    MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> Log.d(TAG, "Decoder format changed: ${decoder.outputFormat}")
+                    MediaCodec.INFO_TRY_AGAIN_LATER -> if (Rtsp.DEBUG) Log.d(TAG, "No output from decoder available")
                     else -> {
                         if (outIndex >= 0) {
                             val byteBuffer: ByteBuffer? = decoder.getOutputBuffer(outIndex)
@@ -170,16 +177,12 @@ class AudioDecoder(
         try {
             decoder.stop()
             decoder.release()
-        } catch (e: InterruptedException) {
-            e.printStackTrace()
+        } catch (_: InterruptedException) {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-
         audioFrameQueue.clear()
-
         if (Rtsp.DEBUG) Log.d(TAG, "$name stopped")
-
     }
 
 }
