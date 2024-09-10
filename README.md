@@ -10,7 +10,7 @@ Unlike [AndroidX Media ExoPlayer](https://github.com/androidx/media) which also 
 
 ## Features
 
-- Android min API 24.
+- Android min API 23.
 - RTSP/RTSPS over TCP.
 - Video H.264 only.
 - Audio AAC LC only.
