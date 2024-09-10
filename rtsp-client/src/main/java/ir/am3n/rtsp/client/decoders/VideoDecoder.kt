@@ -2,11 +2,10 @@ package ir.am3n.rtsp.client.decoders
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.graphics.ImageFormat
 import android.graphics.Rect
-import android.media.Image
 import android.media.MediaCodec
 import android.media.MediaCodec.OnFrameRenderedListener
+import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.os.Build
 import android.os.Process.setThreadPriority
@@ -32,7 +31,6 @@ internal class VideoDecoder(
     private var surfaceView: SurfaceView? = null,
     var requestMediaImage: Boolean,
     var requestYuvBytes: Boolean,
-    var requestNv21Bytes: Boolean,
     var requestBitmap: Boolean,
     private val mimeType: String,
     private val width: Int,
@@ -55,6 +53,8 @@ internal class VideoDecoder(
 
     private val rect = Rect()
     private var exitFlag = AtomicBoolean(false)
+
+    private var keyColorFormat = 0
 
     /** Decoder latency used for statistics */
     @Volatile
@@ -115,145 +115,6 @@ internal class VideoDecoder(
     fun getCurrentNetworkLatencyMillis(): Int {
         return networkLatency
     }
-
-    @SuppressLint("UnsafeOptInUsageError")
-    private fun getDecoderSafeWidthHeight(decoder: MediaCodec): Pair<Int, Int> {
-        val capabilities = decoder.codecInfo.getCapabilitiesForType(mimeType).videoCapabilities
-        return if (capabilities.isSizeSupported(width, height)) {
-            Pair(width, height)
-        } else {
-            val widthAlignment = capabilities.widthAlignment
-            val heightAlignment = capabilities.heightAlignment
-            Pair(
-                Util.ceilDivide(width, widthAlignment) * widthAlignment,
-                Util.ceilDivide(height, heightAlignment) * heightAlignment
-            )
-        }
-    }
-
-    @SuppressLint("InlinedApi")
-    private fun getWidthHeight(mediaFormat: MediaFormat): Pair<Int, Int> {
-        // Sometimes height obtained via KEY_HEIGHT is not valid, e.g. can be 1088 instead 1080
-        // (no problems with width though). Use crop parameters to correctly determine height.
-        val hasCrop =
-            mediaFormat.containsKey(MediaFormat.KEY_CROP_RIGHT) && mediaFormat.containsKey(MediaFormat.KEY_CROP_LEFT) &&
-                    mediaFormat.containsKey(MediaFormat.KEY_CROP_BOTTOM) && mediaFormat.containsKey(MediaFormat.KEY_CROP_TOP)
-        val width =
-            if (hasCrop)
-                mediaFormat.getInteger(MediaFormat.KEY_CROP_RIGHT) - mediaFormat.getInteger(MediaFormat.KEY_CROP_LEFT) + 1
-            else
-                mediaFormat.getInteger(MediaFormat.KEY_WIDTH)
-        var height =
-            if (hasCrop)
-                mediaFormat.getInteger(MediaFormat.KEY_CROP_BOTTOM) - mediaFormat.getInteger(MediaFormat.KEY_CROP_TOP) + 1
-            else
-                mediaFormat.getInteger(MediaFormat.KEY_HEIGHT)
-        // Fix for 1080p resolution for Samsung S21
-        // {crop-right=1919, max-height=4320, sar-width=1, color-format=2130708361, mime=video/raw,
-        // hdr-static-info=java.nio.HeapByteBuffer[pos=0 lim=25 cap=25],
-        // priority=0, color-standard=1, feature-secure-playback=0, color-transfer=3, sar-height=1,
-        // crop-bottom=1087, max-width=8192, crop-left=0, width=1920, color-range=2, crop-top=0,
-        // rotation-degrees=0, frame-rate=30, height=1088}
-        height = height / 16 * 16 // 1088 -> 1080
-//        if (height == 1088)
-//            height = 1080
-        return Pair(width, height)
-    }
-
-    private fun getDecoderMediaFormat(decoder: MediaCodec): MediaFormat {
-        if (Rtsp.DEBUG) Log.v(TAG, "getDecoderMediaFormat()")
-        val safeWidthHeight = getDecoderSafeWidthHeight(decoder)
-        val format = MediaFormat.createVideoFormat(mimeType, safeWidthHeight.first, safeWidthHeight.second)
-        Log.i(TAG, "Configuring surface ${safeWidthHeight.first}x${safeWidthHeight.second} w/ '$mimeType'")
-        format.setInteger(MediaFormat.KEY_ROTATION, rotation)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // format.setFeatureEnabled(android.media.MediaCodecInfo.CodecCapabilities.FEATURE_LowLatency, true)
-            // Request low-latency for the decoder. Not all of the decoders support that.
-            format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
-        }
-        return format
-    }
-
-    private fun createVideoDecoderAndStart(decoderType: DecoderType): MediaCodec {
-        if (Rtsp.DEBUG) Log.v(TAG, "createVideoDecoderAndStart(decoderType=$decoderType)")
-
-        @SuppressLint("UnsafeOptInUsageError")
-        val decoder = when (decoderType) {
-            DecoderType.HARDWARE -> {
-                val hwDecoders = MediaCodecUtils.getHardwareDecoders(mimeType)
-                if (hwDecoders.isEmpty()) {
-                    Log.w(TAG, "Cannot get hardware video decoders for mime type '$mimeType'. Using default one.")
-                    MediaCodec.createDecoderByType(mimeType)
-                } else {
-                    val lowLatencyDecoder = MediaCodecUtils.getLowLatencyDecoder(hwDecoders)
-                    val name = lowLatencyDecoder?.let {
-                        Log.i(TAG, "[$name] Dedicated low-latency decoder found '${lowLatencyDecoder.name}'")
-                        lowLatencyDecoder.name
-                    } ?: hwDecoders[0].name
-                    MediaCodec.createByCodecName(name)
-                }
-            }
-
-            DecoderType.SOFTWARE -> {
-                val swDecoders = MediaCodecUtils.getSoftwareDecoders(mimeType)
-                if (swDecoders.isEmpty()) {
-                    Log.w(TAG, "Cannot get software video decoders for mime type '$mimeType'. Using default one .")
-                    MediaCodec.createDecoderByType(mimeType)
-                } else {
-                    val name = swDecoders[0].name
-                    MediaCodec.createByCodecName(name)
-                }
-            }
-        }
-        this.videoDecoderType = decoderType
-        this.videoDecoderName = decoder.name
-
-        decoder.setOnFrameRenderedListener(frameRenderedListener, null)
-
-        val format = getDecoderMediaFormat(decoder)
-        decoder.configure(format, surface, null, 0)
-        decoder.start()
-
-        val capabilities = decoder.codecInfo.getCapabilitiesForType(mimeType)
-        val lowLatencySupport = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            capabilities.isFeatureSupported(android.media.MediaCodecInfo.CodecCapabilities.FEATURE_LowLatency)
-        } else {
-            false
-        }
-        Log.i(
-            TAG, "[$name] Video decoder '${decoder.name}' started " +
-                    "(${
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            if (decoder.codecInfo.isHardwareAccelerated) "hardware" else "software"
-                        } else ""
-                    }, " +
-                    "${capabilities.capabilitiesToString()}, " +
-                    "${if (lowLatencySupport) "w/" else "w/o"} low-latency support)"
-        )
-
-        return decoder
-    }
-
-    private fun stopAndReleaseVideoDecoder(decoder: MediaCodec) {
-        if (Rtsp.DEBUG) Log.v(TAG, "stopAndReleaseVideoDecoder()")
-        val type = videoDecoderType.toString().lowercase()
-        Log.i(TAG, "Stopping $type video decoder...")
-        try {
-            decoder.stop()
-            Log.i(TAG, "Decoder successfully stopped")
-        } catch (e3: Throwable) {
-            Log.e(TAG, "Failed to stop decoder", e3)
-        }
-        Log.i(TAG, "Releasing decoder...")
-        try {
-            decoder.release()
-            Log.i(TAG, "Decoder successfully released")
-        } catch (e3: Throwable) {
-            Log.e(TAG, "Failed to release decoder", e3)
-        }
-        queue.clear()
-    }
-
 
     override fun run() {
         if (Rtsp.DEBUG) Log.d(TAG, "$name started")
@@ -481,39 +342,181 @@ internal class VideoDecoder(
         }
     }
 
+    @SuppressLint("UnsafeOptInUsageError")
+    private fun getDecoderSafeWidthHeight(decoder: MediaCodec): Pair<Int, Int> {
+        val capabilities = decoder.codecInfo.getCapabilitiesForType(mimeType).videoCapabilities
+        return if (capabilities.isSizeSupported(width, height)) {
+            Pair(width, height)
+        } else {
+            val widthAlignment = capabilities.widthAlignment
+            val heightAlignment = capabilities.heightAlignment
+            Pair(
+                Util.ceilDivide(width, widthAlignment) * widthAlignment,
+                Util.ceilDivide(height, heightAlignment) * heightAlignment
+            )
+        }
+    }
+
+    @SuppressLint("InlinedApi")
+    private fun getWidthHeight(mediaFormat: MediaFormat): Pair<Int, Int> {
+        // Sometimes height obtained via KEY_HEIGHT is not valid, e.g. can be 1088 instead 1080
+        // (no problems with width though). Use crop parameters to correctly determine height.
+        val hasCrop =
+            mediaFormat.containsKey(MediaFormat.KEY_CROP_RIGHT) && mediaFormat.containsKey(MediaFormat.KEY_CROP_LEFT) &&
+                    mediaFormat.containsKey(MediaFormat.KEY_CROP_BOTTOM) && mediaFormat.containsKey(MediaFormat.KEY_CROP_TOP)
+        val width =
+            if (hasCrop)
+                mediaFormat.getInteger(MediaFormat.KEY_CROP_RIGHT) - mediaFormat.getInteger(MediaFormat.KEY_CROP_LEFT) + 1
+            else
+                mediaFormat.getInteger(MediaFormat.KEY_WIDTH)
+        var height =
+            if (hasCrop)
+                mediaFormat.getInteger(MediaFormat.KEY_CROP_BOTTOM) - mediaFormat.getInteger(MediaFormat.KEY_CROP_TOP) + 1
+            else
+                mediaFormat.getInteger(MediaFormat.KEY_HEIGHT)
+        // Fix for 1080p resolution for Samsung S21
+        // {crop-right=1919, max-height=4320, sar-width=1, color-format=2130708361, mime=video/raw,
+        // hdr-static-info=java.nio.HeapByteBuffer[pos=0 lim=25 cap=25],
+        // priority=0, color-standard=1, feature-secure-playback=0, color-transfer=3, sar-height=1,
+        // crop-bottom=1087, max-width=8192, crop-left=0, width=1920, color-range=2, crop-top=0,
+        // rotation-degrees=0, frame-rate=30, height=1088}
+        height = height / 16 * 16 // 1088 -> 1080
+//        if (height == 1088)
+//            height = 1080
+        return Pair(width, height)
+    }
+
+    private fun getDecoderMediaFormat(decoder: MediaCodec): MediaFormat {
+        if (Rtsp.DEBUG) Log.v(TAG, "getDecoderMediaFormat()")
+        val safeWidthHeight = getDecoderSafeWidthHeight(decoder)
+        val format = MediaFormat.createVideoFormat(mimeType, safeWidthHeight.first, safeWidthHeight.second)
+        Log.i(TAG, "Configuring surface ${safeWidthHeight.first}x${safeWidthHeight.second} w/ '$mimeType'")
+        format.setInteger(MediaFormat.KEY_ROTATION, rotation)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // format.setFeatureEnabled(android.media.MediaCodecInfo.CodecCapabilities.FEATURE_LowLatency, true)
+            // Request low-latency for the decoder. Not all of the decoders support that.
+            format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+        }
+        return format
+    }
+
+    private fun createVideoDecoderAndStart(decoderType: DecoderType): MediaCodec {
+        if (Rtsp.DEBUG) Log.v(TAG, "createVideoDecoderAndStart(decoderType=$decoderType)")
+
+        @SuppressLint("UnsafeOptInUsageError")
+        val decoder = when (decoderType) {
+            DecoderType.HARDWARE -> {
+                val hwDecoders = MediaCodecUtils.getHardwareDecoders(mimeType)
+                if (hwDecoders.isEmpty()) {
+                    Log.w(TAG, "Cannot get hardware video decoders for mime type '$mimeType'. Using default one.")
+                    MediaCodec.createDecoderByType(mimeType)
+                } else {
+                    val lowLatencyDecoder = MediaCodecUtils.getLowLatencyDecoder(hwDecoders)
+                    val name = lowLatencyDecoder?.let {
+                        Log.i(TAG, "[$name] Dedicated low-latency decoder found '${lowLatencyDecoder.name}'")
+                        lowLatencyDecoder.name
+                    } ?: hwDecoders[0].name
+                    MediaCodec.createByCodecName(name)
+                }
+            }
+
+            DecoderType.SOFTWARE -> {
+                val swDecoders = MediaCodecUtils.getSoftwareDecoders(mimeType)
+                if (swDecoders.isEmpty()) {
+                    Log.w(TAG, "Cannot get software video decoders for mime type '$mimeType'. Using default one .")
+                    MediaCodec.createDecoderByType(mimeType)
+                } else {
+                    val name = swDecoders[0].name
+                    MediaCodec.createByCodecName(name)
+                }
+            }
+        }
+        this.videoDecoderType = decoderType
+        this.videoDecoderName = decoder.name
+
+        decoder.setOnFrameRenderedListener(frameRenderedListener, null)
+
+        val format = getDecoderMediaFormat(decoder)
+        decoder.configure(format, surface, null, 0)
+        decoder.start()
+
+        this.keyColorFormat = decoder.outputFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT)
+        if (Rtsp.DEBUG) Log.i(TAG, "keyColorFormat= $keyColorFormat")
+
+        val capabilities = decoder.codecInfo.getCapabilitiesForType(mimeType)
+        val lowLatencySupport = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            capabilities.isFeatureSupported(MediaCodecInfo.CodecCapabilities.FEATURE_LowLatency)
+        } else {
+            false
+        }
+        Log.i(
+            TAG, "[$name] Video decoder '${decoder.name}' started " +
+                    "(${
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            if (decoder.codecInfo.isHardwareAccelerated) "hardware" else "software"
+                        } else ""
+                    }, " +
+                    "${capabilities.capabilitiesToString()}, " +
+                    "${if (lowLatencySupport) "w/" else "w/o"} low-latency support)"
+        )
+
+        return decoder
+    }
+
+    private fun stopAndReleaseVideoDecoder(decoder: MediaCodec) {
+        if (Rtsp.DEBUG) Log.v(TAG, "stopAndReleaseVideoDecoder()")
+        val type = videoDecoderType.toString().lowercase()
+        Log.i(TAG, "Stopping $type video decoder...")
+        try {
+            decoder.stop()
+            Log.i(TAG, "Decoder successfully stopped")
+        } catch (e3: Throwable) {
+            Log.e(TAG, "Failed to stop decoder", e3)
+        }
+        Log.i(TAG, "Releasing decoder...")
+        try {
+            decoder.release()
+            Log.i(TAG, "Decoder successfully released")
+        } catch (e3: Throwable) {
+            Log.e(TAG, "Failed to release decoder", e3)
+        }
+        queue.clear()
+    }
+
     private fun decodeYuv(decoder: MediaCodec, info: MediaCodec.BufferInfo, index: Int) {
         try {
 
-            if (surfaceView == null && !requestMediaImage && !requestYuvBytes && !requestNv21Bytes && !requestBitmap)
+            if (surfaceView == null && !requestMediaImage && !requestYuvBytes && !requestBitmap)
                 return
 
-            if (Rtsp.DEBUG) Log.d(
-                TAG,
-                "decodeYuv()   surfaceView=${surfaceView != null}   requestMediaImage=$requestMediaImage    requestYuvBytes=$requestYuvBytes   requestNv21Bytes=$requestNv21Bytes   requestBitmap=$requestBitmap"
-            )
-
-            var yuv420ByteArray: ByteArray? = null
+            var yuvByteArray: ByteArray? = null
             if (requestYuvBytes) {
                 val buffer = decoder.getOutputBuffer(index)
                 buffer!!.position(info.offset)
                 buffer.limit(info.offset + info.size)
-                yuv420ByteArray = ByteArray(buffer.remaining())
-                buffer.get(yuv420ByteArray)
-            }
-
-            var image: Image? = null
-            if (surfaceView != null || requestMediaImage || requestNv21Bytes || requestBitmap) {
-                image = decoder.getOutputImage(index)!!
-            }
-
-            var nv21ByteArray: ByteArray? = null
-            if (surfaceView != null || requestNv21Bytes || requestBitmap) {
-                nv21ByteArray = convertYuv420ImageToNv21ByteArray(image!!)
+                yuvByteArray = ByteArray(buffer.remaining())
+                buffer.get(yuvByteArray)
             }
 
             val bitmap = if (surfaceView?.holder?.surface?.isValid == true || requestBitmap) {
                 try {
-                    Toolkit.yuvToRgbBitmap(nv21ByteArray!!, width, height, YuvFormat.NV21)
+                    when (keyColorFormat) {
+                        MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar,
+                        MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar -> {
+                            Toolkit.yuvToRgbBitmap(yuvByteArray!!, width, height, YuvFormat.YV12)
+                        }
+                        MediaCodecInfo.CodecCapabilities.COLOR_QCOM_FormatYUV420SemiPlanar,
+                        MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar -> {
+                            Toolkit.yuvToRgbBitmap(yuvByteArray!!, width, height, YuvFormat.YV21)
+                        }
+                        MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar,
+                        MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar -> {
+                            Toolkit.yuvToRgbBitmap(yuvByteArray!!, width, height, YuvFormat.NV12)
+                        }
+                        else -> {
+                            throw Exception("Unknown MediaFormat.KEY_COLOR_FORMAT")
+                        }
+                    }
                 } catch (t: Throwable) {
                     t.printStackTrace()
                     null
@@ -535,12 +538,11 @@ internal class VideoDecoder(
                 }
             }
 
-            if (requestMediaImage || requestYuvBytes || requestNv21Bytes || requestBitmap) {
+            if (requestMediaImage || requestYuvBytes || requestBitmap) {
                 clientListener?.onRtspVideoFrameReceived(
                     width, height,
-                    if (requestMediaImage) image else null,
-                    if (requestYuvBytes) yuv420ByteArray else null,
-                    if (requestNv21Bytes) nv21ByteArray else null,
+                    if (requestMediaImage) decoder.getOutputImage(index)!! else null,
+                    if (requestYuvBytes) yuvByteArray else null,
                     if (requestBitmap) bitmap?.copy(Bitmap.Config.ARGB_8888, true) else null
                 )
             }
@@ -548,62 +550,6 @@ internal class VideoDecoder(
         } catch (t: Throwable) {
             t.printStackTrace()
         }
-    }
-
-    private fun convertYuv420ImageToNv21ByteArray(image: Image): ByteArray {
-        val crop = image.cropRect
-        val format = image.format
-        val width = crop.width()
-        val height = crop.height()
-        val planes = image.planes
-        val data = ByteArray(width * height * ImageFormat.getBitsPerPixel(format) / 8)
-        val rowData = ByteArray(planes[0].rowStride)
-        var channelOffset = 0
-        var outputStride = 1
-        for (i in planes.indices) {
-            when (i) {
-                0 -> {
-                    channelOffset = 0
-                    outputStride = 1
-                }
-
-                1 -> {
-                    channelOffset = width * height + 1
-                    outputStride = 2
-                }
-
-                2 -> {
-                    channelOffset = width * height
-                    outputStride = 2
-                }
-            }
-            val buffer = planes[i].buffer
-            val rowStride = planes[i].rowStride
-            val pixelStride = planes[i].pixelStride
-            val shift = if (i == 0) 0 else 1
-            val w = width shr shift
-            val h = height shr shift
-            buffer.position(rowStride * (crop.top shr shift) + pixelStride * (crop.left shr shift))
-            for (row in 0 until h) {
-                var length: Int
-                if (pixelStride == 1 && outputStride == 1) {
-                    length = w
-                    buffer[data, channelOffset, length]
-                    channelOffset += length
-                } else {
-                    length = (w - 1) * pixelStride + 1
-                    buffer[rowData, 0, length]
-                    for (col in 0 until w) {
-                        data[channelOffset] = rowData[col * pixelStride]
-                        channelOffset += outputStride
-                    }
-                }
-                if (row < h - 1) {
-                    buffer.position(buffer.position() + rowStride - length)
-                }
-            }
-        }
-        return data
     }
 
 }

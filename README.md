@@ -16,8 +16,8 @@ Unlike [AndroidX Media ExoPlayer](https://github.com/androidx/media) which also 
 - Audio AAC LC only.
 - Basic/Digest authentication.
 - Supports majority of RTSP IP cameras.
-- Auto Decode raw frames to Media Image & YUV ByteArray & NV21 ByteArray & Bitmap.
-- Using [renderscript-intrinsics-replacement-toolkit](https://github.com/android/renderscript-intrinsics-replacement-toolkit) for NV21 to Bitmap decoding.
+- Auto Decode raw frames to Media Image & YUV ByteArray & Bitmap.
+- Using [renderscript-intrinsics-replacement-toolkit](https://github.com/android/renderscript-intrinsics-replacement-toolkit) for YUV to Bitmap decoding.
 
 ## Permissions
 
@@ -127,7 +127,7 @@ rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {
         // Send raw H264 NAL unit to your custom decoder
     }
-    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {}
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuvBytes: ByteArray?, bitmap: Bitmap?) {}
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
     }
@@ -148,7 +148,7 @@ You can still use library with H264 to YUV MediaImage decoding.
 // ... build rtsp
 rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {}
-    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) { 
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuvBytes: ByteArray?, bitmap: Bitmap?) { 
         // Notice: you should use mediaImage object sync on this thread
     }
     override fun onAudioSampleReceived(frame: Frame?) {
@@ -166,14 +166,14 @@ rtsp.stop()
 
 ### 5) YUV byte array
 
-You can still use library with H264 to YUV420 ByteArray decoding.
+You can still use library with H264 to YUV ByteArray decoding.
 
 ```kotlin
 // ... build rtsp
 rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {}
-    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
-        // you can decode YUV420 to Bitmap by your custom decoder
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuvBytes: ByteArray?, bitmap: Bitmap?) {
+        // you can decode YUV to Bitmap by your custom decoder
     }
     override fun onAudioSampleReceived(frame: Frame?) {
         // Send raw audio to decoder
@@ -188,31 +188,7 @@ rtsp.stop()
 
 ---
 
-### 6) NV21 byte array
-
-You can still use library with H264 to NV21 ByteArray decoding.
-
-```kotlin
-// ... build rtsp
-rtsp.setFrameListener(object : RtspFrameListener {
-    override fun onVideoNalUnitReceived(frame: Frame?) {}
-    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
-        // you can decode NV21 to Bitmap by your custom decoder
-    }
-    override fun onAudioSampleReceived(frame: Frame?) {
-        // Send raw audio to decoder
-    }
-})
-rtsp.setRequestAudioSample(true)
-rtsp.setRequestNv21Bytes(true)
-rtsp.start(playVideo = true, playAudio = true)
-// ...
-rtsp.stop()
-```
-
----
-
-### 7) Bitmap
+### 6) Bitmap
 
 You can still use library with H264 to Bitmap decoding.
 
@@ -220,7 +196,7 @@ You can still use library with H264 to Bitmap decoding.
 // ... build rtsp
 rtsp.setFrameListener(object : RtspFrameListener {
     override fun onVideoNalUnitReceived(frame: Frame?) {}
-    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, bitmap: Bitmap?) {
+    override fun onVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuvBytes: ByteArray?, bitmap: Bitmap?) {
         // Use the bitmap
     }
     override fun onAudioSampleReceived(frame: Frame?) {

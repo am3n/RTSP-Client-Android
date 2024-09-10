@@ -74,7 +74,7 @@ class Rtsp {
                         }
                         override fun onVideoFrameReceived(
                             width: Int, height: Int, mediaImage: Image?,
-                            yuv420Bytes: ByteArray?, nv21Bytes: ByteArray?, bitmap: Bitmap?
+                            yuvBytes: ByteArray?, bitmap: Bitmap?
                         ) {}
                         override fun onAudioSampleReceived(frame: Frame?) {}
                     })
@@ -139,7 +139,6 @@ class Rtsp {
     private var playVideo = true
     private var requestMediaImage = false
     private var requestYuvBytes = false
-    private var requestNv21Bytes = false
     private var requestBitmap = false
 
     private var playAudio = true
@@ -226,8 +225,8 @@ class Rtsp {
             }
         }
 
-        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, nv21Bytes: ByteArray?, bitmap: Bitmap?) {
-            frameListener?.onVideoFrameReceived(width, height, mediaImage, yuv420Bytes, nv21Bytes, bitmap)
+        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuvBytes: ByteArray?, bitmap: Bitmap?) {
+            frameListener?.onVideoFrameReceived(width, height, mediaImage, yuvBytes, bitmap)
         }
 
         override fun onRtspAudioSampleReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
@@ -347,11 +346,6 @@ class Rtsp {
         this.videoDecoder?.requestYuvBytes = requestYuvBytes
     }
 
-    fun setRequestNv21Bytes(requestNv21Bytes: Boolean) {
-        this.requestNv21Bytes = requestNv21Bytes
-        this.videoDecoder?.requestNv21Bytes = requestNv21Bytes
-    }
-
     fun setRequestBitmap(requestBitmap: Boolean) {
         this.requestBitmap = requestBitmap
         this.videoDecoder?.requestBitmap = requestBitmap
@@ -380,7 +374,7 @@ class Rtsp {
             surfaceView?.holder?.addCallback(surfaceCallback)
             videoDecoder?.stopAsync()
             videoDecoder = VideoDecoder(
-                surface = null, surfaceView, requestMediaImage, requestYuvBytes, requestNv21Bytes, requestBitmap,
+                surface = null, surfaceView, requestMediaImage, requestYuvBytes, requestBitmap,
                 videoMimeType, sdpInfo.videoTrack!!.frameWidth, sdpInfo.videoTrack!!.frameHeight, rotation = 0,
                 videoQueue, clientListener = clientListener
             )

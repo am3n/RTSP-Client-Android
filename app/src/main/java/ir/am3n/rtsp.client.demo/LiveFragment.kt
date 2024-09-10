@@ -1,29 +1,28 @@
 package ir.am3n.rtsp.client.demo
 
 import android.annotation.SuppressLint
-import android.graphics.*
+import android.graphics.Bitmap
 import android.media.Image
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
-import android.view.*
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
-import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import ir.am3n.rtsp.client.Rtsp
-import ir.am3n.rtsp.client.interfaces.Frame
 import ir.am3n.rtsp.client.data.SdpInfo
 import ir.am3n.rtsp.client.demo.databinding.FragmentLiveBinding
+import ir.am3n.rtsp.client.interfaces.Frame
 import ir.am3n.rtsp.client.interfaces.RtspFrameListener
 import ir.am3n.rtsp.client.interfaces.RtspStatusListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.lang.Thread.sleep
-import kotlin.concurrent.thread
 
 @SuppressLint("SetTextI18n")
 class LiveFragment : Fragment() {
@@ -131,9 +130,9 @@ class LiveFragment : Fragment() {
 
         override fun onVideoFrameReceived(
             width: Int, height: Int, mediaImage: Image?,
-            yuv420Bytes: ByteArray?, nv21Bytes: ByteArray?, bitmap: Bitmap?
+            yuvBytes: ByteArray?, bitmap: Bitmap?
         ) {
-            Log.d(TAG, "onVideoFrameReceived()   img: $mediaImage   yuv: $yuv420Bytes   nv21: $nv21Bytes   bmp: $bitmap")
+            Log.d(TAG, "onVideoFrameReceived()   img: $mediaImage   yuv: $yuvBytes   bmp: $bitmap")
             binding.img.run {
                 post { setImageBitmap(bitmap) }
             }
@@ -181,14 +180,11 @@ class LiveFragment : Fragment() {
                 rtsp.stop()
             } else {
 
-                binding.rsv.init(liveViewModel.rtspRequest.value!!.toUri())
-                binding.rsv.start(playVideo = true, playAudio = true)
+                //binding.rsv.init(liveViewModel.rtspRequest.value!!.toUri())
+                //binding.rsv.start(playVideo = true, playAudio = true)
 
-                thread {
-                    sleep(2000)
-                    rtsp.init(liveViewModel.rtspRequest.value!!, timeout = 2_000)
-                    rtsp.start(playVideo = true, playAudio = true)
-                }
+                rtsp.init(liveViewModel.rtspRequest.value!!, timeout = 2_000)
+                rtsp.start(playVideo = true, playAudio = false)
 
             }
         }
@@ -198,11 +194,10 @@ class LiveFragment : Fragment() {
 
         rtsp.setSurfaceView(binding.svVideo)
 
-        //rtsp.setRequestMediaImage(true)
-        //rtsp.setRequestYuvBytes(true)
-        //rtsp.setRequestNv21Bytes(true)
-        //rtsp.setRequestBitmap(true)
-        //rtsp.setRequestAudioSample(true)
+        rtsp.setRequestMediaImage(true)
+        rtsp.setRequestYuvBytes(true)
+        rtsp.setRequestBitmap(true)
+        rtsp.setRequestAudioSample(true)
 
         return binding.root
     }
@@ -211,6 +206,7 @@ class LiveFragment : Fragment() {
         super.onResume()
         if (Rtsp.DEBUG) Log.v(TAG, "onResume()")
         liveViewModel.loadParams(requireContext())
+        binding.bnStartStop.performClick()
     }
 
     override fun onPause() {

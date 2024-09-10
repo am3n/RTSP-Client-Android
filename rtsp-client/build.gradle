@@ -4,11 +4,14 @@ plugins {
 }
 
 android {
+
     namespace 'ir.am3n.rtsp.client'
-    compileSdkVersion 34
+
+    compileSdk 34
+
     defaultConfig {
-        minSdkVersion 23
-        targetSdkVersion 34
+        minSdk 23
+        targetSdk 34
         multiDexEnabled true
     }
 
@@ -27,5 +30,5 @@ dependencies {
     implementation "androidx.annotation:annotation:1.5.0"
     implementation "com.google.android.exoplayer:exoplayer-core:2.18.3"
     implementation "androidx.media3:media3-exoplayer:1.4.1"
-    implementation 'com.github.am3n:renderscript-toolkit:'
+    api "com.github.am3n:renderscript-intrinsics-replacement-toolkit:1.0.0"
 }

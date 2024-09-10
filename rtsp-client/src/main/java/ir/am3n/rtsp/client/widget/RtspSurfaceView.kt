@@ -223,7 +223,7 @@ open class RtspSurfaceView : SurfaceView {
             )
         }
 
-        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv420Bytes: ByteArray?, nv21Bytes: ByteArray?, bitmap: Bitmap?) {
+        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuvBytes: ByteArray?, bitmap: Bitmap?) {
 
         }
 
@@ -389,7 +389,6 @@ open class RtspSurfaceView : SurfaceView {
                 surfaceView = null,
                 requestMediaImage = false,
                 requestYuvBytes = false,
-                requestNv21Bytes = false,
                 requestBitmap = false,
                 mimeType = videoMimeType,
                 surfaceWidth,
