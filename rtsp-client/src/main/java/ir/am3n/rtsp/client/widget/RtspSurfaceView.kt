@@ -22,6 +22,7 @@ import ir.am3n.rtsp.client.RtspClientUtils.VIDEO_CODEC_H265
 import ir.am3n.rtsp.client.data.AudioFrame
 import ir.am3n.rtsp.client.data.SdpInfo
 import ir.am3n.rtsp.client.data.VideoFrame
+import ir.am3n.rtsp.client.data.YuvFrame
 import ir.am3n.rtsp.client.decoders.AudioDecoder
 import ir.am3n.rtsp.client.decoders.AudioFrameQueue
 import ir.am3n.rtsp.client.decoders.VideoDecoder
@@ -223,7 +224,7 @@ open class RtspSurfaceView : SurfaceView {
             )
         }
 
-        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuvBytes: ByteArray?, bitmap: Bitmap?) {
+        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv: YuvFrame?, bitmap: Bitmap?) {
 
         }
 
@@ -388,7 +389,7 @@ open class RtspSurfaceView : SurfaceView {
                 surface = holder.surface,
                 surfaceView = null,
                 requestMediaImage = false,
-                requestYuvBytes = false,
+                requestYuv = false,
                 requestBitmap = false,
                 mimeType = videoMimeType,
                 surfaceWidth,

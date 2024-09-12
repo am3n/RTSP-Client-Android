@@ -14,6 +14,7 @@ import ir.am3n.rtsp.client.data.AudioFrame
 import ir.am3n.rtsp.client.interfaces.Frame
 import ir.am3n.rtsp.client.data.SdpInfo
 import ir.am3n.rtsp.client.data.VideoFrame
+import ir.am3n.rtsp.client.data.YuvFrame
 import ir.am3n.rtsp.client.decoders.AudioDecoder
 import ir.am3n.rtsp.client.decoders.AudioFrameQueue
 import ir.am3n.rtsp.client.decoders.VideoDecoder
@@ -74,7 +75,7 @@ class Rtsp {
                         }
                         override fun onVideoFrameReceived(
                             width: Int, height: Int, mediaImage: Image?,
-                            yuvBytes: ByteArray?, bitmap: Bitmap?
+                            yuv: YuvFrame?, bitmap: Bitmap?
                         ) {}
                         override fun onAudioSampleReceived(frame: Frame?) {}
                     })
@@ -138,7 +139,7 @@ class Rtsp {
 
     private var playVideo = true
     private var requestMediaImage = false
-    private var requestYuvBytes = false
+    private var requestYuv = false
     private var requestBitmap = false
 
     private var playAudio = true
@@ -225,8 +226,8 @@ class Rtsp {
             }
         }
 
-        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuvBytes: ByteArray?, bitmap: Bitmap?) {
-            frameListener?.onVideoFrameReceived(width, height, mediaImage, yuvBytes, bitmap)
+        override fun onRtspVideoFrameReceived(width: Int, height: Int, mediaImage: Image?, yuv: YuvFrame?, bitmap: Bitmap?) {
+            frameListener?.onVideoFrameReceived(width, height, mediaImage, yuv, bitmap)
         }
 
         override fun onRtspAudioSampleReceived(data: ByteArray, offset: Int, length: Int, timestamp: Long) {
@@ -341,9 +342,9 @@ class Rtsp {
         this.videoDecoder?.requestMediaImage = requestMediaImage
     }
 
-    fun setRequestYuvBytes(requestYuvBytes: Boolean) {
-        this.requestYuvBytes = requestYuvBytes
-        this.videoDecoder?.requestYuvBytes = requestYuvBytes
+    fun setRequestYuv(requestYuv: Boolean) {
+        this.requestYuv = requestYuv
+        this.videoDecoder?.requestYuv = requestYuv
     }
 
     fun setRequestBitmap(requestBitmap: Boolean) {
@@ -374,7 +375,7 @@ class Rtsp {
             surfaceView?.holder?.addCallback(surfaceCallback)
             videoDecoder?.stopAsync()
             videoDecoder = VideoDecoder(
-                surface = null, surfaceView, requestMediaImage, requestYuvBytes, requestBitmap,
+                surface = null, surfaceView, requestMediaImage, requestYuv, requestBitmap,
                 videoMimeType, sdpInfo.videoTrack!!.frameWidth, sdpInfo.videoTrack!!.frameHeight, rotation = 0,
                 videoQueue, clientListener = clientListener
             )

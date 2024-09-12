@@ -19,6 +19,7 @@ import com.google.android.renderscript.YuvFormat
 import ir.am3n.rtsp.client.interfaces.RtspClientListener
 import androidx.media3.common.util.Util
 import ir.am3n.rtsp.client.Rtsp
+import ir.am3n.rtsp.client.data.YuvFrame
 import ir.am3n.utils.DecoderType
 import ir.am3n.utils.MediaCodecUtils
 import ir.am3n.utils.capabilitiesToString
@@ -30,7 +31,7 @@ internal class VideoDecoder(
     private var surface: Surface? = null,
     private var surfaceView: SurfaceView? = null,
     var requestMediaImage: Boolean,
-    var requestYuvBytes: Boolean,
+    var requestYuv: Boolean,
     var requestBitmap: Boolean,
     private val mimeType: String,
     private val width: Int,
@@ -486,16 +487,34 @@ internal class VideoDecoder(
     private fun decodeYuv(decoder: MediaCodec, info: MediaCodec.BufferInfo, index: Int) {
         try {
 
-            if (surfaceView == null && !requestMediaImage && !requestYuvBytes && !requestBitmap)
+            if (surfaceView == null && !requestMediaImage && !requestYuv && !requestBitmap)
                 return
 
             var yuvByteArray: ByteArray? = null
-            if (requestYuvBytes) {
+            var yuvFormat: YuvFormat? = null
+            if (requestYuv) {
                 val buffer = decoder.getOutputBuffer(index)
                 buffer!!.position(info.offset)
                 buffer.limit(info.offset + info.size)
                 yuvByteArray = ByteArray(buffer.remaining())
                 buffer.get(yuvByteArray)
+                when (keyColorFormat) {
+                    MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar,
+                    MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar -> {
+                        yuvFormat = YuvFormat.YV12
+                    }
+                    MediaCodecInfo.CodecCapabilities.COLOR_QCOM_FormatYUV420SemiPlanar,
+                    MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar -> {
+                        yuvFormat = YuvFormat.YV21
+                    }
+                    MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar,
+                    MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar -> {
+                        yuvFormat = YuvFormat.NV12
+                    }
+                    else -> {
+                        throw Exception("Unknown MediaFormat.KEY_COLOR_FORMAT")
+                    }
+                }
             }
 
             val bitmap = if (surfaceView?.holder?.surface?.isValid == true || requestBitmap) {
@@ -538,11 +557,11 @@ internal class VideoDecoder(
                 }
             }
 
-            if (requestMediaImage || requestYuvBytes || requestBitmap) {
+            if (requestMediaImage || requestYuv || requestBitmap) {
                 clientListener?.onRtspVideoFrameReceived(
                     width, height,
                     if (requestMediaImage) decoder.getOutputImage(index)!! else null,
-                    if (requestYuvBytes) yuvByteArray else null,
+                    if (requestYuv) YuvFrame(yuvByteArray!!, yuvFormat) else null,
                     if (requestBitmap) bitmap?.copy(Bitmap.Config.ARGB_8888, true) else null
                 )
             }

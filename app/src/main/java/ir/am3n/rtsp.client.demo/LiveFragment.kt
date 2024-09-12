@@ -15,6 +15,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import ir.am3n.rtsp.client.Rtsp
 import ir.am3n.rtsp.client.data.SdpInfo
+import ir.am3n.rtsp.client.data.YuvFrame
 import ir.am3n.rtsp.client.demo.databinding.FragmentLiveBinding
 import ir.am3n.rtsp.client.interfaces.Frame
 import ir.am3n.rtsp.client.interfaces.RtspFrameListener
@@ -130,9 +131,9 @@ class LiveFragment : Fragment() {
 
         override fun onVideoFrameReceived(
             width: Int, height: Int, mediaImage: Image?,
-            yuvBytes: ByteArray?, bitmap: Bitmap?
+            yuv: YuvFrame?, bitmap: Bitmap?
         ) {
-            Log.d(TAG, "onVideoFrameReceived()   img: $mediaImage   yuv: $yuvBytes   bmp: $bitmap")
+            Log.d(TAG, "onVideoFrameReceived()   img: $mediaImage   yuv: $yuv   bmp: $bitmap")
             binding.img.run {
                 post { setImageBitmap(bitmap) }
             }
@@ -195,7 +196,7 @@ class LiveFragment : Fragment() {
         rtsp.setSurfaceView(binding.svVideo)
 
         rtsp.setRequestMediaImage(true)
-        rtsp.setRequestYuvBytes(true)
+        rtsp.setRequestYuv(true)
         rtsp.setRequestBitmap(true)
         rtsp.setRequestAudioSample(true)
 
